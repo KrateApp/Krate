@@ -645,6 +645,8 @@ const state = {
   lastPlaced:           null,   // track id of most recently placed track (for flash anim)
 };
 
+const AUDIO_BASE = 'http://localhost:5001';
+
 // ---------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------
@@ -2199,7 +2201,7 @@ async function loadTrackInPlayer(track) {
     artImg.style.display = '';
     artPh.style.display  = 'none';
   };
-  testArt.src = '/api/track/' + encodeURIComponent(track.id) + '/art';
+  testArt.src = AUDIO_BASE + '/art/' + encodeURIComponent(track.id);
 
   // Init AudioContext (must be created after user gesture)
   if (!playerState.audioCtx) {
@@ -2207,7 +2209,7 @@ async function loadTrackInPlayer(track) {
   }
 
   try {
-    const res  = await fetch('/api/track/' + encodeURIComponent(track.id) + '/audio');
+    const res  = await fetch(AUDIO_BASE + '/audio/' + encodeURIComponent(track.id));
     if (!res.ok) throw new Error('No se pudo cargar el audio');
     const buf  = await res.arrayBuffer();
     const decoded = await playerState.audioCtx.decodeAudioData(buf);
@@ -2532,11 +2534,21 @@ document.getElementById('xml-dialog').addEventListener('click', e => {
   if (e.target === document.getElementById('xml-dialog')) closeXmlModal();
 });
 
+async function checkAudioServer() {
+  try {
+    await fetch(AUDIO_BASE + '/ping', { signal: AbortSignal.timeout(2000) });
+  } catch(e) {
+    const el = document.getElementById('player-meta-empty');
+    if (el) el.textContent = 'Servidor de audio no detectado — corre krate_audio.py para reproducir música';
+  }
+}
+
 // ---------------------------------------------------------------
 // INIT
 // ---------------------------------------------------------------
 applyInboxGridStyle();
 loadAll();
+checkAudioServer();
 </script>
 </body>
 </html>
