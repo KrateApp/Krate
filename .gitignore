@@ -3,8 +3,6 @@
 Rekordbox.xml
 Rekordbox_krate.xml
 playlist_vibes.json
-krate.bat
-krate_dashboard.bat
 
 # Archivos que Python genera automáticamente
 __pycache__/
