@@ -1,0 +1,2542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRATE</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%;background:#050504}
+body{font-family:var(--font-sans,system-ui);margin:0}
+.app{background:#0A0908;display:grid;grid-template-columns:200px 1fr;grid-template-rows:44px 1fr 68px;width:100%;height:100vh;overflow:hidden}
+
+/* topbar */
+.topbar{grid-column:1/-1;background:#080807;border-bottom:1px solid #1A1914;display:flex;align-items:center;padding:0 16px;gap:16px}
+.topbar-logo{font-family:Impact,'Arial Black',sans-serif;font-size:18px;color:#E8E4DA;letter-spacing:3px}
+.topbar-sep{width:1px;height:16px;background:#1A1914;flex-shrink:0}
+.topbar-stat{font-size:12px;color:#6A6858;letter-spacing:1px;white-space:nowrap}
+.topbar-stat span{color:#9A9880}
+.topbar-mode{margin-left:auto;display:flex;gap:4px}
+.mode-pill{font-size:10px;padding:4px 10px;border-radius:20px;cursor:pointer;letter-spacing:1px;color:#666;border:1px solid #1A1914;transition:all .15s}
+.mode-pill.active{background:#FF3D1A;color:#fff;border-color:#FF3D1A}
+
+/* sidebar */
+.sidebar{background:#070706;border-right:1px solid #1A1914;overflow-y:auto;display:flex;flex-direction:column}
+.sidebar-section{padding:14px 12px 6px;font-size:9px;color:#6A6858;letter-spacing:3px;flex-shrink:0}
+.nav-item{padding:7px 12px;font-size:12px;color:#6A6858;cursor:pointer;display:flex;align-items:center;gap:8px;border-left:2px solid transparent;transition:all .1s;flex-shrink:0}
+.nav-item:hover{color:#888;background:#0C0B09}
+.nav-item.active{color:#E8E4DA;border-left-color:#FF3D1A;background:#0E0D0B}
+.nav-item.active .nav-dot{background:#FF3D1A}
+.nav-dot{width:5px;height:5px;border-radius:50%;background:#2A2A22;flex-shrink:0}
+.dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dot.filled{background:#FF3D1A}
+.dot.empty{border:1px solid #2A2A22;background:transparent}
+.pl-item{padding:6px 12px;font-size:11px;color:#3A3830;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background .1s}
+.pl-item:hover{background:#0C0B09;color:#6A6858}
+.pl-item .pl-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-item .pl-count{font-size:9px;color:#6A6858;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid #1A1914;flex-shrink:0}
+.sidebar-footer-stat{font-size:9px;color:#6A6858;letter-spacing:1px;line-height:1.8}
+.sidebar-footer-stat span{color:#3A3830}
+
+/* main */
+.main{display:flex;flex-direction:column;overflow:hidden;min-width:0}
+/* panels */
+.panel{padding:20px;flex:1;display:none;flex-direction:column;gap:16px;overflow-y:auto}
+.panel.visible{display:flex}
+.sort-label{font-size:9px;color:#6A6858;letter-spacing:3px;display:flex;align-items:center;gap:10px}
+.selected-chip{font-size:10px;color:#9A9880;letter-spacing:0;font-weight:normal;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* track browser */
+.track-browser{background:#060605;border:1px solid #1A1914;border-radius:4px;overflow:hidden;display:flex;flex-direction:column;max-height:200px;flex-shrink:0}
+.track-search{width:100%;background:transparent;border:none;border-bottom:1px solid #1A1914;outline:none;color:#C8C4B8;font-size:12px;padding:8px 12px;font-family:inherit}
+.track-search::placeholder{color:#3A3830}
+.track-list-scroll{overflow-y:auto;flex:1}
+.track-row{padding:7px 12px;cursor:pointer;display:grid;gap:0 16px;align-items:center;border-bottom:1px solid #0C0C09;transition:background .1s}
+.track-row:last-child{border-bottom:none}
+.track-row:hover{background:#0C0B09}
+.track-row.active{background:#100D0B;border-left:2px solid #FF3D1A}
+.track-row-name{font-size:12px;color:#C8C4B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track-row-artist{font-size:11px;color:#6A6858;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track-row-meta{font-size:11px;color:#6A6858;text-align:right;white-space:nowrap}
+.track-row-cell{font-size:11px;color:#6A6858;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* panels (sort) */
+.sort-input-wrap{background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px}
+.sort-input{width:100%;background:transparent;border:none;outline:none;color:#C8C4B8;font-size:13px;line-height:1.7;resize:none;font-family:inherit}
+.sort-actions{display:flex;gap:8px;align-items:center}
+.btn-primary{background:#FF3D1A;color:#fff;border:none;font-size:11px;padding:7px 16px;border-radius:3px;cursor:pointer;letter-spacing:1px;transition:opacity .1s}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.sort-hint{font-size:10px;color:#6A6858;margin-left:auto;letter-spacing:1px}
+.results-label{font-size:9px;color:#6A6858;letter-spacing:3px;display:flex;align-items:center;gap:8px}
+.results-label::after{content:'';flex:1;height:1px;background:#1A1914}
+.result-card{background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;transition:border-color .1s,opacity .3s;opacity:0;animation:krate-slide-up 220ms cubic-bezier(0.16,1,0.3,1) forwards}
+@keyframes krate-slide-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.result-card.best{border-color:#FF3D1A}
+.result-card.done{animation:krate-card-out 250ms cubic-bezier(0.4,0,1,1) forwards;pointer-events:none}
+.result-card--create{border-style:dashed;border-color:#2A2A22}
+.result-card--create:hover{border-color:#6A6858}
+.result-rank{font-size:9px;color:#333;letter-spacing:1px;min-width:20px;padding-top:2px;flex-shrink:0}
+.result-rank.best{color:#FF3D1A}
+.result-name{font-size:13px;color:#C8C4B8;font-weight:500;margin-bottom:3px}
+.result-name.dim{color:#888}
+.result-why{font-size:11px;color:#6A6858;line-height:1.5}
+.result-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+.ra-btn{font-size:10px;padding:5px 10px;border-radius:3px;cursor:pointer;letter-spacing:1px;border:none}
+.ra-btn.place{background:#E8E4DA;color:#0A0908}
+.ra-btn.skip{border:1px solid #1A1914;color:#444;background:transparent}
+.no-match{background:#060605;border:1px dashed #1A1914;border-radius:4px;padding:20px;text-align:center}
+.no-match p{font-size:12px;color:#6A6858;line-height:1.8}
+.matching-state{font-size:11px;color:#6A6858;letter-spacing:2px;padding:20px;text-align:center}
+
+/* vibe setup panel */
+.vibe-list{display:flex;flex-direction:column;gap:3px}
+.vibe-row{background:#060605;border:1px solid #1A1914;border-radius:4px;padding:10px 14px;cursor:pointer;transition:border-color .1s}
+.vibe-row:hover{border-color:#2A2A22}
+.vibe-row.editing{border-color:#FF3D1A;cursor:default}
+.vibe-row-top{display:flex;align-items:center;gap:8px}
+.vibe-mark{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.vibe-mark.done{background:#FF3D1A}
+.vibe-mark.empty{border:1px solid #2A2A22;background:transparent}
+.vibe-pl-name{font-size:12px;color:#C8C4B8;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vibe-pl-name.dim{color:#3A3830}
+.vibe-tag{font-size:9px;padding:2px 8px;border-radius:10px;letter-spacing:1px;flex-shrink:0}
+.vibe-tag.cpt{background:#1A1610;color:#554020;border:1px solid #2A2018}
+.vibe-tag.mas{background:#0E1018;color:#202840;border:1px solid #181E30}
+.vibe-desc{font-size:11px;color:#6A6858;margin-top:6px;padding-left:13px;line-height:1.5}
+.vibe-input-row{margin-top:8px;padding-left:13px;display:flex;gap:8px}
+.vibe-input{flex:1;background:#0A0908;border:1px solid #333;border-radius:3px;padding:6px 10px;color:#C8C4B8;font-size:12px;outline:none;font-family:inherit}
+.vibe-save{font-size:10px;padding:6px 12px;background:#FF3D1A;color:#fff;border:none;border-radius:3px;cursor:pointer;letter-spacing:1px}
+
+/* all vibes panel */
+.vibes-grid{display:flex;flex-direction:column;gap:2px}
+.vg-row{padding:10px 14px;border-bottom:1px solid #0E0E0A;display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:start}
+.vg-name{font-size:12px;color:#C8C4B8}
+.vg-name.dim{color:#3A3830}
+.vg-vibe{font-size:11px;color:#6A6858;line-height:1.5}
+.vg-empty{font-size:11px;color:#6A6858;font-style:italic}
+
+/* manage panel (legacy — kept for manage-empty class used elsewhere) */
+.manage-empty{padding:14px;font-size:11px;color:#6A6858;text-align:center}
+
+/* unified playlists panel */
+.pl-mgmt-section{background:#060605;border:1px solid #1A1914;border-radius:4px;overflow:hidden;margin-bottom:4px}
+.pl-mgmt-header{padding:10px 14px;border-bottom:1px solid #1A1914;font-size:9px;color:#6A6858;letter-spacing:3px}
+.pl-mgmt-row{padding:10px 14px;display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid #0E0E0A;flex-wrap:wrap}
+.pl-mgmt-row:last-child{border-bottom:none}
+.pl-mgmt-body{flex:1;min-width:0}
+.pl-mgmt-name{font-size:12px;color:#C8C4B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-mgmt-name.dim{color:#3A3830}
+.pl-mgmt-desc{font-size:11px;color:#6A6858;margin-top:3px;line-height:1.4}
+.pl-mgmt-desc.empty{font-style:italic;color:#2A2A22}
+.pl-mgmt-actions{flex-shrink:0;display:flex;gap:4px;align-items:center;padding-top:1px}
+.pl-action{font-size:10px;padding:4px 8px;border-radius:3px;cursor:pointer;letter-spacing:0.5px;border:1px solid #1A1914;color:#6A6858;background:transparent;white-space:nowrap;transition:all .1s}
+.pl-action:hover{border-color:#333;color:#888}
+.pl-action.restore{color:#FF3D1A;border-color:#2A1510}
+.pl-action.restore:hover{border-color:#FF3D1A}
+.pl-move-btn{width:22px;height:22px;font-size:11px;padding:0;border-radius:3px;cursor:pointer;border:1px solid #1A1914;color:#444;background:transparent;display:flex;align-items:center;justify-content:center;transition:all .1s;line-height:1}
+.pl-move-btn:hover{border-color:#333;color:#888}
+.pl-inline-edit{margin-top:6px;display:flex;gap:6px;width:100%;flex-basis:100%}
+.pl-inline-input{flex:1;background:#0A0908;border:1px solid #333;border-radius:3px;padding:5px 8px;color:#C8C4B8;font-size:12px;outline:none;font-family:inherit}
+.pl-inline-save{font-size:10px;padding:5px 10px;background:#FF3D1A;color:#fff;border:none;border-radius:3px;cursor:pointer;letter-spacing:0.5px}
+
+/* session panel */
+.session-summary{display:flex;flex-direction:column;gap:3px}
+.session-row{padding:10px 14px;background:#060605;border:1px solid #1A1914;border-radius:4px;display:flex;align-items:center;gap:10px}
+.session-track{font-size:12px;color:#C8C4B8;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-track-artist{color:#6A6858}
+.session-arrow{font-size:11px;color:#FF3D1A;flex-shrink:0}
+.session-playlist{font-size:12px;color:#9A9880;flex-shrink:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-actions{display:flex;gap:8px;align-items:center}
+.session-modified-list{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.session-pl-row{padding:7px 14px;background:#060605;border:1px solid #1A1914;border-radius:4px;display:flex;align-items:center;gap:8px}
+.session-pl-name{font-size:12px;color:#9A9880;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-pl-count{font-size:10px;color:#3A3830;flex-shrink:0;letter-spacing:0.5px}
+.export-result{font-size:11px;color:#6A6858;letter-spacing:1px}
+.export-result span{color:#9A9880}
+.session-badge{margin-left:auto;font-size:9px;color:#FF3D1A}
+
+/* playlist detail panel */
+.playlist-detail-header{display:flex;align-items:baseline;gap:12px;flex-shrink:0}
+.playlist-detail-count{font-size:11px;color:#6A6858}
+#playlist-detail-tracks{flex:1;overflow-y:auto}
+#panel-playlist{overflow:hidden}
+/* column picker toggle */
+.pl-col-btn{font-size:10px;margin-left:auto;background:transparent;border:1px solid #1A1914;border-radius:3px;color:#3A3830;cursor:pointer;padding:2px 8px;letter-spacing:0.5px;transition:all .1s;flex-shrink:0}
+.pl-col-btn:hover{border-color:#333;color:#888}
+.pl-col-btn.open{border-color:#FF3D1A;color:#FF3D1A}
+/* column picker panel */
+#col-picker{background:#060605;border:1px solid #1A1914;border-radius:4px;padding:8px 10px;flex-shrink:0}
+.col-picker-list{display:flex;flex-wrap:wrap;gap:6px}
+.col-picker-item{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;color:#6A6858;background:#0A0908;border:1px solid #1A1914;border-radius:3px;padding:3px 7px;letter-spacing:0.5px;transition:border-color .1s;user-select:none}
+.col-picker-item:hover{border-color:#333;color:#888}
+.col-picker-item input{accent-color:#FF3D1A;cursor:pointer;margin:0}
+/* column headers */
+#playlist-col-header{flex-shrink:0;border-bottom:1px solid #0E0E0A}
+.col-header-row{display:grid;padding:4px 12px;gap:0 16px}
+.col-hdr{font-size:9px;color:#2A2A22;letter-spacing:2px;cursor:grab;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .1s;padding:2px 0}
+.col-hdr:hover{color:#6A6858}
+.col-hdr.dragging{opacity:0.3;cursor:grabbing}
+.col-hdr.drag-over{color:#FF3D1A}
+.inbox-col-header-row{display:grid;padding:0;gap:0;border-bottom:1px solid #0E0E0A}
+.inbox-col-hdr{font-size:9px;color:#2A2A22;letter-spacing:2px;cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .1s;padding:3px 10px;border-right:1px solid #1A1914}
+.inbox-col-hdr:last-child{border-right:none}
+.inbox-col-hdr:hover,.inbox-col-hdr.sorted{color:#6A6858}
+#track-list .track-row{gap:0;padding:0}
+#track-list .track-row>div{padding:7px 10px;border-right:1px solid #0C0C09;min-width:0}
+#track-list .track-row>div:last-child{border-right:none}
+#track-list .track-row-actions{padding:4px 10px 4px;border-right:none!important}
+
+/* voice recognition controls */
+.voice-controls{display:flex;align-items:center;gap:6px}
+.voice-mic-btn{background:transparent;border:1px solid #1A1914;border-radius:3px;color:#3A3830;cursor:pointer;padding:3px 10px;font-size:11px;letter-spacing:0.5px;transition:all .1s;flex-shrink:0}
+.voice-mic-btn:hover{border-color:#333;color:#6A6858}
+.voice-mic-btn.listening{border-color:#FF3D1A;color:#FF3D1A;animation:voice-pulse 1s ease-in-out infinite}
+.voice-lang-btn{background:transparent;border:1px solid #1A1914;border-radius:3px;color:#2A2A22;cursor:pointer;padding:2px 7px;font-size:9px;letter-spacing:1px;transition:all .1s}
+.voice-lang-btn:hover{border-color:#333;color:#6A6858}
+.voice-lang-btn.active{border-color:#FF3D1A;color:#FF3D1A}
+@keyframes voice-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* track row actions (expanded when selected) */
+.track-row-actions{grid-column:1/-1;display:flex;gap:6px;padding:8px 0 2px}
+.tr-action-btn{font-size:10px;padding:4px 10px;border-radius:3px;cursor:pointer;letter-spacing:0.5px;border:1px solid #FF3D1A;color:#FF3D1A;background:transparent;transition:all .1s}
+.tr-action-btn:hover{background:#FF3D1A;color:#0A0908}
+.tr-action-btn.move{border-color:#9A9880;color:#9A9880}
+.tr-action-btn.move:hover{background:#9A9880;color:#0A0908}
+.tr-action-btn.del{border-color:#2A2A22;color:#3A3830}
+.tr-action-btn.del:hover{border-color:#555;color:#888;background:transparent}
+/* action dialog */
+.dialog-overlay{position:fixed;inset:0;z-index:200;background:rgba(5,5,4,0.88);display:none;align-items:center;justify-content:center}
+.dialog-overlay.open{display:flex}
+.dialog-box{background:#080807;border:1px solid #1A1914;border-radius:4px;width:520px;max-width:90vw;max-height:80vh;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+
+/* error state */
+.err-state{font-size:11px;color:#FF3D1A;opacity:0.6;padding:20px;text-align:center}
+
+/* inbox placed — restore on click */
+/* Inbox drawer layout */
+#inbox-active{overflow:hidden;flex:1;min-height:0}
+#inbox-main{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+#inbox-main .track-browser{flex:1 1 0;min-height:0;max-height:none}
+#inbox-drawer{flex:0 0 0;overflow:hidden;transition:flex-basis 420ms cubic-bezier(0.16,1,0.3,1)}
+#inbox-drawer.open{flex-basis:44%}
+#inbox-drawer-inner{display:flex;flex-direction:column;gap:12px;padding-top:12px;height:100%;overflow:hidden;transform:translateY(24px);opacity:0;transition:transform 420ms cubic-bezier(0.16,1,0.3,1),opacity 360ms ease}
+#inbox-drawer.open #inbox-drawer-inner{transform:translateY(0);opacity:1}
+#inbox-drawer #results-area{flex:1;overflow-y:auto;min-height:0}
+.inbox-placed { opacity: 0.3; cursor: pointer; transition: opacity 150ms ease; }
+.inbox-placed:hover { opacity: 0.65; }
+.inbox-restore-hint { color: #3A3830; font-size: 10px; margin-left: 6px; letter-spacing: 0.5px; transition: color 150ms ease; }
+.inbox-placed:hover .inbox-restore-hint { color: #9A9880; }
+
+/* xml picker */
+.xml-change-btn{display:block;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #1A1914;color:#2A2A22;font-size:9px;letter-spacing:2px;padding:0 0 8px;cursor:pointer;margin-bottom:8px;transition:color .1s}
+.xml-change-btn:hover{color:#6A6858}
+
+/* 1. Place track — card slide-out */
+@keyframes krate-card-out {
+  from { opacity: 1;  transform: translateX(0);   }
+  to   { opacity: 0;  transform: translateX(48px); }
+}
+
+/* 1b. Inbox track placed — green flash */
+@keyframes krate-track-placed {
+  0%   { background: transparent; }
+  18%  { background: rgba(50, 140, 70, 0.28); }
+  65%  { background: rgba(50, 140, 70, 0.06); }
+  100% { background: transparent; opacity: 0.3; }
+}
+.track-row.just-placed {
+  animation: krate-track-placed 520ms ease forwards;
+  pointer-events: none;
+}
+
+/* 3. Panel crossfade */
+@keyframes krate-panel-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.panel.leaving {
+  animation: krate-panel-out 120ms ease forwards;
+  pointer-events: none;
+}
+.main { position: relative; }
+
+/* 4. Sidebar dot pulse */
+@keyframes krate-dot-pop {
+  0%   { transform: scale(1);   }
+  50%  { transform: scale(1.7); }
+  100% { transform: scale(1);   }
+}
+.dot.filled.pulse {
+  animation: krate-dot-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 5. Searching animated dots */
+@keyframes krate-dot-appear {
+  0%, 70%, 100% { opacity: 0; }
+  35%           { opacity: 0.9; }
+}
+.krate-dots { display: inline-flex; gap: 3px; margin-left: 5px; letter-spacing: 0; }
+.krate-dots span { opacity: 0; }
+.krate-dots span:nth-child(1) { animation: krate-dot-appear 1.2s 0.0s ease-in-out infinite; }
+.krate-dots span:nth-child(2) { animation: krate-dot-appear 1.2s 0.22s ease-in-out infinite; }
+.krate-dots span:nth-child(3) { animation: krate-dot-appear 1.2s 0.44s ease-in-out infinite; }
+.xml-upload-label{display:block;background:#060605;border:1px dashed #1A1914;border-radius:4px;padding:14px;cursor:pointer;font-size:11px;color:#3A3830;text-align:center;transition:border-color .1s,color .1s}
+.xml-upload-label:hover{border-color:#333;color:#6A6858}
+.xml-upload-label.has-file{border-color:#FF3D1A;color:#9A9880}
+
+/* toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(16px);background:#E8E4DA;color:#0A0908;font-size:11px;padding:8px 16px;border-radius:3px;letter-spacing:1px;opacity:0;transition:opacity 200ms ease,transform 250ms cubic-bezier(0.16,1,0.3,1);pointer-events:none;z-index:999}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* player bar */
+.player-bar{grid-column:1/-1;background:#070706;border-top:1px solid #1A1914;display:flex;align-items:center;gap:10px;padding:0 12px;overflow:hidden}
+.player-art{width:44px;height:44px;flex-shrink:0;background:#0E0D0B;border-radius:2px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid #1A1914}
+.player-art img{width:100%;height:100%;object-fit:cover}
+.player-art-ph{font-size:16px;color:#2A2A22}
+.player-meta{flex-shrink:0;width:160px;min-width:0;overflow:hidden}
+.player-meta-name{font-size:11px;color:#C8C4B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.player-meta-artist{font-size:10px;color:#6A6858;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.player-meta-empty{font-size:10px;color:#2A2A22;letter-spacing:1px}
+.player-ctrl{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.player-btn{font-size:14px;color:#9A9880;background:transparent;border:1px solid #1A1914;border-radius:3px;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;transition:border-color .1s,color .1s}
+.player-btn:hover{color:#E8E4DA;border-color:#333}
+.player-btn:disabled{opacity:0.3;cursor:not-allowed}
+.player-wave-wrap{flex:1;position:relative;height:44px;cursor:pointer}
+#waveform-canvas{width:100%;height:100%;display:block}
+.player-time{position:absolute;right:0;bottom:2px;font-size:9px;color:#3A3830;letter-spacing:1px;pointer-events:none}
+
+/* Selección de track */
+.selected-chip {
+  display: inline-block;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.selected-chip.visible {
+  opacity: 1;
+}
+
+.track-row {
+  border-left: 2px solid transparent;
+  transition: border-left-color 150ms ease,
+              background 150ms ease,
+              opacity 300ms ease;
+}
+
+/* Colocar track */
+.track-row.placed {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Contador flip */
+@keyframes krate-count-flip {
+  0%   { transform: translateY(0);    opacity: 1; }
+  40%  { transform: translateY(-6px); opacity: 0; }
+  60%  { transform: translateY(6px);  opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
+#inbox-count-label.updating {
+  animation: krate-count-flip 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Navegación entre paneles */
+@keyframes krate-panel-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel.entering {
+  animation: krate-panel-in 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.nav-item {
+  transition: color 150ms ease,
+              background 150ms ease,
+              border-left-color 150ms ease;
+}
+
+/* Player */
+@keyframes krate-play-loading {
+  0%, 100% { opacity: 0.3; transform: scale(0.95); }
+  50%       { opacity: 0.7; transform: scale(1.02); }
+}
+#player-play-btn:disabled {
+  animation: krate-play-loading 1s ease-in-out infinite;
+}
+#player-play-btn:not(:disabled) {
+  animation: none;
+  transition: transform 100ms ease, color 100ms ease;
+}
+#player-play-btn:not(:disabled):active {
+  transform: scale(0.92);
+}
+
+#waveform-canvas {
+  clip-path: inset(0 100% 0 0);
+  opacity: 0;
+  transition: clip-path 600ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 350ms ease;
+}
+#waveform-canvas.drawn {
+  clip-path: inset(0 0% 0 0);
+  opacity: 1;
+}
+#waveform-canvas.wf-loading {
+  opacity: 0 !important;
+  transition: none !important;
+}
+
+.player-meta-name,
+.player-meta-artist {
+  transition: opacity 200ms ease;
+}
+.player-meta-name.changing,
+.player-meta-artist.changing {
+  opacity: 0;
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-logo">KRATE</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-stat" id="stat-library">— pistas · — playlists</div>
+    <div class="topbar-mode">
+      <div class="mode-pill active" onclick="setMode('review',this)">Revisión</div>
+      <div class="mode-pill" onclick="setMode('auto',this)">Auto</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">NAVEGACIÓN</div>
+    <div class="nav-item active" data-panel="sort" onclick="showPanel('sort',this)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M3 6h6M5 9h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      Inbox
+    </div>
+    <div class="nav-item" data-panel="playlists" onclick="showPanel('playlists',this)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" rx="0.5" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="1" width="4" height="4" rx="0.5" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="7" width="4" height="4" rx="0.5" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="7" width="4" height="4" rx="0.5" stroke="currentColor" stroke-width="1.2"/></svg>
+      Playlists
+    </div>
+    <div class="nav-item" data-panel="session" onclick="showPanel('session',this)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 2h10M1 6h10M1 10h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      Sesión
+      <span class="session-badge" id="session-badge" style="display:none"></span>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:8px">PLAYLISTS</div>
+    <div id="sidebar-playlists"></div>
+
+    <div class="sidebar-footer">
+      <button class="xml-change-btn" onclick="openXmlModal()">CAMBIAR XML</button>
+      <div id="sidebar-footer-content">
+        <div class="sidebar-footer-stat" style="color:#FF3D1A;opacity:0.4">v0.4 · Phase 3</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- INBOX / SORT PANEL -->
+    <div class="panel visible" id="panel-sort">
+
+      <!-- Mode A: no inbox selected -->
+      <div id="inbox-picker">
+        <div class="sort-label">ELIGE TU PLAYLIST INBOX</div>
+        <div style="font-size:11px;color:#6A6858;line-height:1.6;margin-bottom:12px">
+          Esta es la lista de canciones que aún no tienen playlist. Krate te ayuda a colocar cada una donde pertenece.
+        </div>
+        <div id="inbox-picker-list">
+          <div class="matching-state">Cargando playlists...</div>
+        </div>
+      </div>
+
+      <!-- Mode B: inbox active -->
+      <div id="inbox-active" style="display:none;flex-direction:column">
+
+        <!-- Main section: track list + description -->
+        <div id="inbox-main">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <div class="sort-label" id="inbox-name-label">INBOX</div>
+            <div style="font-size:11px;color:#6A6858" id="inbox-count-label"></div>
+            <button style="margin-left:auto;font-size:10px;color:#444;background:transparent;border:1px solid #1A1914;border-radius:3px;padding:3px 8px;cursor:pointer;letter-spacing:0.5px" onclick="clearInbox()">cambiar</button>
+          </div>
+          <div class="sort-label">PISTAS <span id="selected-chip" class="selected-chip"></span></div>
+          <div class="track-browser">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input class="track-search" id="track-search" placeholder="Buscar artista o pista..." oninput="renderInboxTracks()">
+              <button class="pl-col-btn" id="inbox-col-picker-btn" onclick="toggleInboxColPicker()">⊞</button>
+            </div>
+            <div id="inbox-col-picker" style="display:none"></div>
+            <div id="inbox-col-header"></div>
+            <div class="track-list-scroll" id="track-list">
+              <div class="matching-state">Cargando...</div>
+            </div>
+          </div>
+          <div class="sort-label">DESCRIPCIÓN DE PISTA</div>
+          <div class="sort-input-wrap">
+            <textarea class="sort-input" id="sort-textarea" rows="3" placeholder="Dicta lo que sientes, o escríbelo tú mismo..."></textarea>
+          </div>
+          <div class="sort-actions">
+            <div class="voice-controls" id="sort-voice-controls">
+              <button class="voice-mic-btn" id="sort-voice-btn" onclick="toggleVoice('sort')">⏺ Hablar</button>
+              <button class="voice-lang-btn active" data-lang="es-US" onclick="setVoiceLang('es-US','sort')">ES</button>
+              <button class="voice-lang-btn" data-lang="en-US" onclick="setVoiceLang('en-US','sort')">EN</button>
+            </div>
+            <button class="btn-primary" id="match-btn" onclick="doMatch()">Coincidir</button>
+            <div class="sort-hint" id="sort-hint">Modo revisión · — playlists activas</div>
+          </div>
+        </div>
+
+        <!-- Suggestions drawer: slides up from bottom -->
+        <div id="inbox-drawer">
+          <div id="inbox-drawer-inner">
+            <div class="results-label">SUGERENCIAS</div>
+            <div id="results-area">
+              <div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- PLAYLISTS PANEL (unified) -->
+    <div class="panel" id="panel-playlists">
+      <div id="playlists-active-section"></div>
+      <div id="playlists-hidden-section"></div>
+    </div>
+
+    <!-- SESSION PANEL -->
+    <div class="panel" id="panel-session">
+      <div class="sort-label">ASIGNACIONES DE SESIÓN</div>
+      <div class="session-summary" id="session-list">
+        <div class="manage-empty">Aún no has colocado pistas.</div>
+      </div>
+      <div id="session-modified" style="display:none">
+        <div class="sort-label" style="margin-top:4px">PLAYLISTS MODIFICADAS</div>
+        <div class="session-modified-list" id="session-modified-list"></div>
+      </div>
+      <div class="session-actions" id="session-actions" style="display:none">
+        <button class="btn-primary" onclick="exportXML()">Exportar a Rekordbox</button>
+      </div>
+      <div class="export-result" id="export-result"></div>
+    </div>
+
+    <!-- PLAYLIST DETAIL PANEL -->
+    <div class="panel" id="panel-playlist">
+      <div class="playlist-detail-header">
+        <div class="sort-label" id="playlist-detail-name"></div>
+        <div class="playlist-detail-count" id="playlist-detail-count"></div>
+        <button class="pl-col-btn" id="col-picker-btn" onclick="toggleColPicker()">⊞ columnas</button>
+      </div>
+      <div id="col-picker" style="display:none"></div>
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
+        <div id="playlist-col-header"></div>
+        <div id="playlist-detail-tracks">
+          <div class="matching-state">Cargando...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PLAYER BAR -->
+  <div class="player-bar">
+    <div class="player-art" id="player-art">
+      <img id="player-art-img" style="display:none" alt="">
+      <div class="player-art-ph" id="player-art-ph">♪</div>
+    </div>
+    <div class="player-meta">
+      <div class="player-meta-empty" id="player-meta-empty">SIN PISTA</div>
+      <div class="player-meta-name" id="player-meta-name" style="display:none"></div>
+      <div class="player-meta-artist" id="player-meta-artist" style="display:none"></div>
+    </div>
+    <div class="player-ctrl">
+      <button class="player-btn" id="player-play-btn" onclick="togglePlay()" disabled title="Reproducir">▶</button>
+    </div>
+    <div class="player-wave-wrap" id="player-wave-wrap">
+      <canvas id="waveform-canvas"></canvas>
+      <div class="player-time" id="player-time"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ACTION DIALOG -->
+<div id="action-dialog" class="dialog-overlay">
+  <div class="dialog-box">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <div class="sort-label" id="dialog-title">DESCRIBIR PISTA</div>
+      <button style="margin-left:auto;font-size:20px;line-height:1;color:#444;background:transparent;border:none;cursor:pointer;padding:0 2px" onclick="closeActionDialog()">×</button>
+    </div>
+    <div id="dialog-describe-section" style="display:flex;flex-direction:column;gap:12px">
+      <div class="sort-input-wrap">
+        <textarea class="sort-input" id="dialog-textarea" rows="3" placeholder="Describe el vibe de la pista..."></textarea>
+      </div>
+      <div class="sort-actions">
+        <div class="voice-controls" id="dialog-voice-controls">
+          <button class="voice-mic-btn" id="dialog-voice-btn" onclick="toggleVoice('dialog')">⏺ Hablar</button>
+          <button class="voice-lang-btn active" data-lang="es-US" onclick="setVoiceLang('es-US','dialog')">ES</button>
+          <button class="voice-lang-btn" data-lang="en-US" onclick="setVoiceLang('en-US','dialog')">EN</button>
+        </div>
+        <button class="btn-primary" id="dialog-match-btn" onclick="doDialogMatch()">Coincidir</button>
+        <div class="sort-hint" id="dialog-hint"></div>
+      </div>
+    </div>
+    <div class="results-label">SUGERENCIAS</div>
+    <div id="dialog-results-area">
+      <div class="no-match"><p>Describe el vibe y presiona Coincidir.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- XML PICKER DIALOG -->
+<div id="xml-dialog" class="dialog-overlay">
+  <div class="dialog-box" style="width:440px;max-width:90vw">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <div class="sort-label">FUENTE XML</div>
+      <button style="margin-left:auto;font-size:20px;line-height:1;color:#444;background:transparent;border:none;cursor:pointer;padding:0 2px" onclick="closeXmlModal()">×</button>
+    </div>
+    <div style="font-size:11px;color:#6A6858">
+      Activo: <span id="xml-current-name" style="color:#9A9880">—</span>
+    </div>
+    <div>
+      <div class="sort-label" style="margin-bottom:8px">SUBIR ARCHIVO</div>
+      <label class="xml-upload-label" id="xml-upload-label-el">
+        <input type="file" id="xml-file-input" accept=".xml" style="display:none" onchange="handleXmlFile(this)">
+        <span id="xml-file-label">Seleccionar o arrastrar archivo .xml...</span>
+      </label>
+    </div>
+    <div>
+      <div class="sort-label" style="margin-bottom:8px">O ESCRIBIR RUTA LOCAL</div>
+      <div style="display:flex;gap:6px">
+        <input class="pl-inline-input" id="xml-path-input" placeholder="C:\ruta\al\archivo.xml" style="flex:1" onkeydown="if(event.key==='Enter')submitXmlPath()">
+        <button class="pl-inline-save" onclick="submitXmlPath()">Aplicar</button>
+      </div>
+    </div>
+    <div id="xml-dialog-result"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------------------------------------------------------------
+// STATE
+// ---------------------------------------------------------------
+const state = {
+  mode:                 'review',
+  playlists:            [],
+  stats:                {},
+  inbox:                null,   // designated inbox playlist name
+  inboxTracks:          [],     // tracks currently in inbox
+  playlistDetailTracks: [],     // tracks of the currently open sidebar queue
+  currentPlaylistName:  null,   // name of currently open playlist detail
+  selected:             null,
+  selectedFrom:         null,   // playlist name the current track came from
+  session:              {},
+  lastPlaced:           null,   // track id of most recently placed track (for flash anim)
+};
+
+// ---------------------------------------------------------------
+// HELPERS
+// ---------------------------------------------------------------
+function displayName(name) {
+  return name
+    .replace(/^MASMASMAS\s*[-–]\s*/i, '')
+    .replace(/\s*\(\d+\)\s*$/, '')
+    .trim();
+}
+
+function playlistDisplayName(internalName) {
+  const pl = state.playlists.find(p => p.name === internalName);
+  return (pl && pl.custom_name) ? pl.custom_name : displayName(internalName);
+}
+
+function isCPT(name) {
+  return /\bCPT\b/.test(displayName(name));
+}
+
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---------------------------------------------------------------
+// PANEL / MODE SWITCHING
+// ---------------------------------------------------------------
+function showPanel(id, navEl) {
+  const current = document.querySelector('.panel.visible');
+
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  if (current && current.id !== 'panel-' + id) {
+    current.style.position    = 'absolute';
+    current.style.inset       = '0';
+    current.style.zIndex      = '1';
+    current.classList.add('leaving');
+    current.addEventListener('animationend', () => {
+      current.classList.remove('visible', 'leaving');
+      current.style.cssText = '';
+    }, { once: true });
+  } else if (current) {
+    current.classList.remove('visible');
+  }
+
+  const enteringPanel = document.getElementById('panel-' + id);
+  enteringPanel.classList.add('visible', 'entering');
+  enteringPanel.addEventListener('animationend', () => {
+    enteringPanel.classList.remove('entering');
+  }, { once: true });
+
+  if (navEl) {
+    navEl.classList.add('active');
+  } else {
+    const nav = document.querySelector('.nav-item[data-panel="' + id + '"]');
+    if (nav) nav.classList.add('active');
+  }
+}
+
+function setMode(m, el) {
+  state.mode = m;
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  updateSortHint();
+}
+
+function updateSortHint() {
+  const active = state.playlists.filter(p => !p.hidden && p.vibe && p.vibe.trim()).length;
+  const label  = state.mode === 'auto' ? 'Auto' : 'Revisión';
+  document.getElementById('sort-hint').textContent = 'Modo ' + label.toLowerCase() + ' · ' + active + ' playlists activas';
+}
+
+// ---------------------------------------------------------------
+// LOAD DATA
+// ---------------------------------------------------------------
+async function loadAll() {
+  await Promise.all([loadStats(), loadPlaylists(), loadInbox(), loadSession()]);
+}
+
+async function loadStats() {
+  try {
+    const res  = await fetch('/api/stats');
+    state.stats = await res.json();
+    renderTopbar();
+  } catch(e) {
+    console.error('stats error', e);
+  }
+}
+
+async function loadPlaylists() {
+  try {
+    const res       = await fetch('/api/playlists');
+    state.playlists = await res.json();
+    renderSidebar();
+    renderPlaylistsPanel();
+    renderInboxPanel();
+    updateSortHint();
+  } catch(e) {
+    console.error('playlists error', e);
+  }
+}
+
+async function loadInbox() {
+  try {
+    const res  = await fetch('/api/inbox');
+    const data = await res.json();
+    state.inbox       = data.name || null;
+    state.inboxTracks = data.tracks || [];
+    renderInboxPanel();
+  } catch(e) {
+    console.error('inbox error', e);
+  }
+}
+
+async function setInbox(name) {
+  await fetch('/api/set-inbox', {
+    method:  'POST',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({name})
+  });
+  state.inbox = name;
+  await loadInbox();
+}
+
+async function clearInbox() {
+  await fetch('/api/set-inbox', {
+    method:  'POST',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({name: null})
+  });
+  state.inbox       = null;
+  state.inboxTracks = [];
+  renderInboxPanel();
+}
+
+function renderInboxPanel() {
+  const picker = document.getElementById('inbox-picker');
+  const active = document.getElementById('inbox-active');
+  if (!picker || !active) return;
+
+  if (!state.inbox) {
+    // Mode A: show picker
+    picker.style.display = '';
+    active.style.display = 'none';
+    const active_pls = state.playlists.filter(p => !p.hidden);
+    if (!active_pls.length) {
+      document.getElementById('inbox-picker-list').innerHTML =
+        '<div class="matching-state">Cargando playlists...</div>';
+      return;
+    }
+    document.getElementById('inbox-picker-list').innerHTML =
+      active_pls.map(p =>
+        '<div class="pl-item" onclick="setInbox(\'' + esc(p.name).replace(/'/g, "\\'") + '\')">'
+        + '<div class="dot ' + (p.vibe ? 'filled' : 'empty') + '"></div>'
+        + '<span class="pl-name">' + esc(playlistDisplayName(p.name)) + '</span>'
+        + '<span class="pl-count">' + (p.count || '') + '</span>'
+        + '</div>'
+      ).join('');
+  } else {
+    // Mode B: show inbox tracks
+    picker.style.display = 'none';
+    active.style.display = 'flex';
+    document.getElementById('inbox-name-label').textContent = playlistDisplayName(state.inbox).toUpperCase();
+    renderInboxTracks();
+  }
+}
+
+function renderInboxTracks() {
+  const q        = (document.getElementById('track-search')?.value || '').toLowerCase();
+  const filtered = q
+    ? state.inboxTracks.filter(t =>
+        t.name.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))
+    : state.inboxTracks;
+
+  const remaining = state.inboxTracks.filter(t => !state.session[t.id]).length;
+  const countEl   = document.getElementById('inbox-count-label');
+  if (countEl) {
+    countEl.classList.remove('updating');
+    void countEl.offsetWidth;
+    countEl.textContent = remaining + ' / ' + state.inboxTracks.length + ' restantes';
+    countEl.classList.add('updating');
+    countEl.addEventListener('animationend', () => {
+      countEl.classList.remove('updating');
+    }, { once: true });
+  }
+
+  const listEl = document.getElementById('track-list');
+  if (!listEl) return;
+
+  // Apply sort
+  let sorted = [...filtered];
+  if (inboxSort.col) {
+    sorted.sort((a, b) => {
+      const av = (getColValue(a, inboxSort.col) || '').toLowerCase();
+      const bv = (getColValue(b, inboxSort.col) || '').toLowerCase();
+      return inboxSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+  }
+
+  if (!sorted.length) {
+    listEl.innerHTML = '<div class="matching-state">No se encontraron pistas.</div>';
+    renderInboxColHeader();
+    return;
+  }
+
+  const visibleCols = inboxColumnConfig.filter(c => c.visible);
+
+  listEl.innerHTML = sorted.map(t => {
+    const placed     = !!state.session[t.id];
+    const justPlaced = t.id === state.lastPlaced;
+    const isActive   = state.selected && state.selected.id === t.id ? ' active' : '';
+    const extraClass = justPlaced ? ' just-placed' : '';
+
+    // Placed (but not mid-animation): restore row using grid columns
+    if (placed && !justPlaced) {
+      const cells = visibleCols.map(col => {
+        if (col.id === 'name') return '<div class="track-row-name">' + esc(t.name) + ' <span class="inbox-restore-hint">↩ restaurar</span></div>';
+        if (col.id === 'artist') return '<div class="track-row-artist">' + esc(t.artist) + '</div>';
+        return '<div class="track-row-cell"></div>';
+      }).join('');
+      return '<div class="track-row inbox-placed" onclick="unassignTrack(\'' + esc(t.id) + '\')">' + cells + '</div>';
+    }
+
+    const cells = visibleCols.map(col => {
+      const val = getColValue(t, col.id);
+      const cls = col.id === 'name' ? 'track-row-name' : col.id === 'artist' ? 'track-row-artist' : 'track-row-cell';
+      return '<div class="' + cls + '">' + esc(val) + '</div>';
+    }).join('');
+
+    return '<div class="track-row' + isActive + extraClass + '" onclick="selectInboxTrack(\'' + esc(t.id) + '\')">'
+      + cells
+      + (isActive
+          ? '<div class="track-row-actions" onclick="event.stopPropagation()">'
+            + '<button class="tr-action-btn del" onclick="rejectInboxTrack(\'' + esc(t.id) + '\')">✕ Rechazar</button>'
+            + '</div>'
+          : '')
+      + '</div>';
+  }).join('');
+  state.lastPlaced = null;
+  renderInboxColHeader();
+}
+
+async function loadSession() {
+  try {
+    const res  = await fetch('/api/session');
+    const list = await res.json();
+    state.session = {};
+    list.forEach(a => { state.session[a.track_id] = a; });
+    renderSessionPanel();
+  } catch(e) {
+    console.error('session error', e);
+  }
+}
+
+// ---------------------------------------------------------------
+// RENDER: TOPBAR
+// ---------------------------------------------------------------
+function renderTopbar() {
+  const s   = state.stats;
+  const lib = document.getElementById('stat-library');
+  lib.textContent = (s.tracks || '—') + ' pistas · ' + (s.playlists || '—') + ' playlists' + (s.hidden ? ' · ' + s.hidden + ' ocultas' : '');
+
+}
+
+// ---------------------------------------------------------------
+// RENDER: SIDEBAR
+// ---------------------------------------------------------------
+let _sidebarFilledDots = new Set();
+
+function renderSidebar() {
+  const active = state.playlists.filter(p => !p.hidden);
+  const html = active.map(p => {
+    const hasVibe   = p.vibe && p.vibe.trim();
+    const justFilled = hasVibe && !_sidebarFilledDots.has(p.name);
+    return '<div class="pl-item" onclick="openPlaylist(\'' + esc(p.name).replace(/'/g, "\\'") + '\')">'
+      + '<div class="dot ' + (hasVibe ? 'filled' + (justFilled ? ' pulse' : '') : 'empty') + '"></div>'
+      + '<span class="pl-name" style="' + (hasVibe ? 'color:#6A6858' : 'color:#2A2A22') + '">' + esc(playlistDisplayName(p.name)) + '</span>'
+      + '<span class="pl-count">' + (p.count || '') + '</span>'
+      + '</div>';
+  }).join('');
+  _sidebarFilledDots = new Set(active.filter(p => p.vibe && p.vibe.trim()).map(p => p.name));
+  document.getElementById('sidebar-playlists').innerHTML = html;
+
+  const masCount = active.filter(p => !isCPT(p.name)).length;
+  const cptCount = active.filter(p => isCPT(p.name)).length;
+  document.getElementById('sidebar-footer-content').innerHTML =
+    '<div class="sidebar-footer-stat">MASMASMAS: <span>' + masCount + '</span></div>' +
+    '<div class="sidebar-footer-stat">CPT: <span>' + cptCount + '</span></div>' +
+    '<div class="sidebar-footer-stat" style="margin-top:6px;color:#FF3D1A;opacity:0.4">v0.4 · Fase 3</div>';
+}
+
+function selectInboxTrack(id) {
+  const t = state.inboxTracks.find(tr => tr.id === id);
+  if (!t) return;
+  state.selected     = t;
+  state.selectedFrom = state.inbox;
+  renderInboxTracks();
+  const chip = document.getElementById('selected-chip');
+  if (chip) {
+    chip.textContent = '— ' + t.artist + ' · ' + t.name;
+    chip.classList.remove('visible');
+    void chip.offsetWidth;
+    chip.classList.add('visible');
+  }
+  loadTrackInPlayer(t);
+}
+
+function selectTrackById(id) {
+  // Used by selectTrackFromPlaylist (sidebar queue) — search cached playlist tracks
+  const t = (state.playlistDetailTracks || []).find(tr => tr.id === id)
+         || state.inboxTracks.find(tr => tr.id === id);
+  if (!t) return;
+  state.selected = t;
+  const chip = document.getElementById('selected-chip');
+  if (chip) chip.textContent = '— ' + t.artist + ' · ' + t.name;
+}
+
+// ---------------------------------------------------------------
+// RENDER: UNIFIED PLAYLISTS PANEL
+// ---------------------------------------------------------------
+function renderPlaylistsPanel() {
+  const active = state.playlists.filter(p => !p.hidden);
+  const hidden = state.playlists.filter(p => p.hidden);
+
+  const activeHtml = active.length
+    ? active.map(p => {
+        const masterIdx = state.playlists.indexOf(p);
+        const hasVibe   = p.vibe && p.vibe.trim();
+        const isFirst   = masterIdx === 0 || state.playlists.slice(0, masterIdx).every(q => q.hidden);
+        const isLast    = masterIdx === state.playlists.length - 1 || state.playlists.slice(masterIdx + 1).every(q => q.hidden);
+        return '<div class="pl-mgmt-row" id="plrow-' + masterIdx + '">'
+          + '<div class="dot ' + (hasVibe ? 'filled' : 'empty') + '" style="margin-top:3px;flex-shrink:0"></div>'
+          + '<div class="pl-mgmt-body">'
+          + '<div class="pl-mgmt-name">' + esc(playlistDisplayName(p.name)) + (p.virtual ? '<span style="font-size:9px;color:#2A2A22;margin-left:8px;letter-spacing:1px">VIRTUAL</span>' : '') + '</div>'
+          + '<div class="pl-mgmt-desc' + (hasVibe ? '' : ' empty') + '">'
+          + (hasVibe ? esc(p.vibe) : 'sin descripción') + '</div>'
+          + '</div>'
+          + '<div class="pl-mgmt-actions">'
+          + '<button class="pl-action" onclick="editVibeInline(' + masterIdx + ')">Editar</button>'
+          + '<button class="pl-move-btn" onclick="movePlaylist(' + masterIdx + ',-1)"' + (isFirst ? ' disabled style="opacity:0.2"' : '') + '>↑</button>'
+          + '<button class="pl-move-btn" onclick="movePlaylist(' + masterIdx + ',1)"' + (isLast ? ' disabled style="opacity:0.2"' : '') + '>↓</button>'
+          + '<button class="pl-action" id="del-btn-' + masterIdx + '" onclick="deletePlaylistConfirm(' + masterIdx + ',this)">Borrar</button>'
+          + '</div>'
+          + '</div>';
+      }).join('')
+    : '<div class="manage-empty">Sin playlists activas.</div>';
+
+  const hiddenHtml = hidden.length
+    ? hidden.map(p => {
+        const masterIdx = state.playlists.indexOf(p);
+        return '<div class="pl-mgmt-row">'
+          + '<div class="dot empty" style="margin-top:3px;flex-shrink:0"></div>'
+          + '<div class="pl-mgmt-body">'
+          + '<div class="pl-mgmt-name dim">' + esc(playlistDisplayName(p.name)) + '</div>'
+          + '</div>'
+          + '<div class="pl-mgmt-actions">'
+          + '<button class="pl-action restore" onclick="restorePlaylist(' + masterIdx + ')">Restaurar</button>'
+          + '</div>'
+          + '</div>';
+      }).join('')
+    : '';
+
+  document.getElementById('playlists-active-section').innerHTML =
+    '<div class="pl-mgmt-section">'
+    + '<div class="pl-mgmt-header" style="display:flex;align-items:center">PLAYLISTS ACTIVAS <span style="color:#3A3830;margin-left:4px">· ' + active.length + '</span>'
+    + '<button class="pl-action" style="margin-left:auto" onclick="showCreateForm()">+ Nueva</button></div>'
+    + '<div id="create-form-slot"></div>'
+    + activeHtml + '</div>';
+
+  document.getElementById('playlists-hidden-section').innerHTML = hidden.length
+    ? '<div class="pl-mgmt-section">'
+      + '<div class="pl-mgmt-header">PLAYLISTS OCULTAS</div>'
+      + hiddenHtml + '</div>'
+    : '';
+}
+
+function editVibeInline(masterIdx) {
+  document.querySelectorAll('.pl-inline-edit').forEach(el => el.remove());
+  const pl  = state.playlists[masterIdx];
+  if (!pl) return;
+  const row = document.getElementById('plrow-' + masterIdx);
+  if (!row) return;
+
+  const editDiv = document.createElement('div');
+  editDiv.className = 'pl-inline-edit';
+  editDiv.style.flexDirection = 'column';
+  editDiv.style.gap = '4px';
+  editDiv.innerHTML =
+    '<div style="display:flex;gap:6px;width:100%">'
+    + '<input class="pl-inline-input" id="pl-name-input-' + masterIdx + '"'
+    + ' value="' + esc(pl.custom_name || displayName(pl.name)) + '"'
+    + ' placeholder="Nombre visible..." style="flex:1"/>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;width:100%">'
+    + '<input class="pl-inline-input" id="pl-vibe-input-' + masterIdx + '"'
+    + ' value="' + esc(pl.vibe || '') + '" placeholder="Describe el vibe..." style="flex:1"/>'
+    + '<button class="pl-inline-save" onclick="saveVibeInline(' + masterIdx + ')">Guardar</button>'
+    + '</div>';
+
+  row.appendChild(editDiv);
+
+  const nameInput = document.getElementById('pl-name-input-' + masterIdx);
+  const vibeInput = document.getElementById('pl-vibe-input-' + masterIdx);
+  nameInput.focus();
+  nameInput.select();
+  [nameInput, vibeInput].forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  saveVibeInline(masterIdx);
+      if (e.key === 'Escape') renderPlaylistsPanel();
+    });
+  });
+}
+
+async function saveVibeInline(masterIdx) {
+  const pl        = state.playlists[masterIdx];
+  if (!pl) return;
+  const vibeInput = document.getElementById('pl-vibe-input-' + masterIdx);
+  const nameInput = document.getElementById('pl-name-input-' + masterIdx);
+  const vibe      = vibeInput ? vibeInput.value.trim() : '';
+  const newName   = nameInput ? nameInput.value.trim() : '';
+
+  const saves = [
+    fetch('/api/vibes/' + encodeURIComponent(pl.name), {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({vibe})
+    })
+  ];
+
+  const originalDisplay = pl.custom_name || displayName(pl.name);
+  if (newName !== originalDisplay) {
+    saves.push(
+      fetch('/api/playlists/rename', {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify({original_name: pl.name, new_display_name: newName})
+      })
+    );
+  }
+
+  try {
+    await Promise.all(saves);
+    pl.vibe        = vibe;
+    pl.custom_name = (newName !== displayName(pl.name)) ? newName : '';
+    renderPlaylistsPanel();
+    renderSidebar();
+    updateSortHint();
+    showToast('Guardado');
+  } catch(e) {
+    showToast('Error al guardar');
+  }
+}
+
+async function movePlaylist(masterIdx, dir) {
+  // Find the next active (non-hidden) neighbor in the given direction
+  const arr = state.playlists;
+  let swapIdx = masterIdx + dir;
+  while (swapIdx >= 0 && swapIdx < arr.length && arr[swapIdx].hidden) {
+    swapIdx += dir;
+  }
+  if (swapIdx < 0 || swapIdx >= arr.length) return;
+  [arr[masterIdx], arr[swapIdx]] = [arr[swapIdx], arr[masterIdx]];
+  renderPlaylistsPanel();
+  renderSidebar();
+  await saveOrder();
+}
+
+async function saveOrder() {
+  try {
+    await fetch('/api/playlists/reorder', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({order: state.playlists.map(p => p.name)})
+    });
+  } catch(e) {
+    console.error('reorder error', e);
+  }
+}
+
+async function hidePlaylist(masterIdx) {
+  const pl = state.playlists[masterIdx];
+  if (!pl) return;
+  await fetch('/api/playlists/hide', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify({name: pl.name})
+  });
+  pl.hidden = true;
+  renderSidebar(); renderPlaylistsPanel(); updateSortHint();
+  await loadStats();
+}
+
+async function restorePlaylist(masterIdx) {
+  const pl = state.playlists[masterIdx];
+  if (!pl) return;
+  await fetch('/api/playlists/restore', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify({name: pl.name})
+  });
+  pl.hidden = false;
+  renderSidebar(); renderPlaylistsPanel(); updateSortHint();
+  await loadStats();
+}
+
+function showCreateForm() {
+  const slot = document.getElementById('create-form-slot');
+  if (!slot) return;
+  if (slot.querySelector('.pl-create-form')) { slot.innerHTML = ''; return; }
+  slot.innerHTML =
+    '<div class="pl-create-form pl-inline-edit" style="flex-direction:column;gap:4px;padding:10px 0 6px;border-bottom:1px solid #0E0E0A">'
+    + '<div style="display:flex;gap:6px">'
+    + '<input class="pl-inline-input" id="new-pl-name" placeholder="Nombre de la playlist..." style="flex:1"/>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px">'
+    + '<input class="pl-inline-input" id="new-pl-vibe" placeholder="Describe el vibe..." style="flex:1"/>'
+    + '<button class="pl-inline-save" onclick="createPlaylist()">Crear</button>'
+    + '</div>'
+    + '</div>';
+  document.getElementById('new-pl-name').focus();
+}
+
+async function createPlaylist() {
+  const name = (document.getElementById('new-pl-name')?.value || '').trim();
+  const vibe = (document.getElementById('new-pl-vibe')?.value || '').trim();
+  if (!name) { showToast('Escribe un nombre'); return; }
+  try {
+    await fetch('/api/playlists/create', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({name, vibe})
+    });
+    await loadPlaylists();
+    await loadStats();
+    showToast('Playlist creada');
+  } catch(e) {
+    showToast('Error al crear');
+  }
+}
+
+function deletePlaylistConfirm(masterIdx, btn) {
+  btn.textContent      = '¿Confirmar?';
+  btn.style.color      = '#FF3D1A';
+  btn.style.borderColor = '#FF3D1A';
+  btn.onclick = (e) => { e.stopPropagation(); deletePlaylist(masterIdx); };
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className   = 'pl-action';
+  cancelBtn.textContent = 'Cancelar';
+  cancelBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    btn.textContent       = 'Borrar';
+    btn.style.color       = '';
+    btn.style.borderColor = '';
+    btn.onclick = (e2) => { e2.stopPropagation(); deletePlaylistConfirm(masterIdx, btn); };
+    cancelBtn.remove();
+  });
+  btn.insertAdjacentElement('afterend', cancelBtn);
+}
+
+async function deletePlaylist(masterIdx) {
+  const pl = state.playlists[masterIdx];
+  if (!pl) return;
+  try {
+    await fetch('/api/playlists/delete', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({name: pl.name})
+    });
+    state.playlists.splice(masterIdx, 1);
+    renderPlaylistsPanel();
+    renderSidebar();
+    updateSortHint();
+    await loadStats();
+    showToast('Playlist eliminada');
+  } catch(e) {
+    showToast('Error al eliminar');
+  }
+}
+
+// ---------------------------------------------------------------
+// RENDER: SESSION PANEL
+// ---------------------------------------------------------------
+function renderSessionPanel() {
+  const entries = Object.entries(state.session);
+  const badge   = document.getElementById('session-badge');
+  const actions = document.getElementById('session-actions');
+
+  if (badge) {
+    badge.textContent  = entries.length || '';
+    badge.style.display = entries.length ? '' : 'none';
+  }
+  if (actions) actions.style.display = entries.length ? 'flex' : 'none';
+
+  const html = entries.length
+    ? entries.map(([, a]) =>
+        '<div class="session-row">'
+        + '<div class="session-track">' + esc(a.name) + ' <span class="session-track-artist">· ' + esc(a.artist) + '</span></div>'
+        + '<div class="session-arrow">→</div>'
+        + '<div class="session-playlist">' + esc(playlistDisplayName(a.playlist)) + '</div>'
+        + '</div>'
+      ).join('')
+    : '<div class="manage-empty">Aún no has colocado pistas.</div>';
+
+  document.getElementById('session-list').innerHTML = html;
+
+  // Modified playlists section
+  const counts = {};
+  for (const a of Object.values(state.session)) {
+    if (a.playlist) counts[a.playlist] = (counts[a.playlist] || 0) + 1;
+  }
+  const plEntries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  const modSection = document.getElementById('session-modified');
+  const modList    = document.getElementById('session-modified-list');
+  if (modSection && modList) {
+    modSection.style.display = plEntries.length ? '' : 'none';
+    modList.innerHTML = plEntries.map(([pl, n]) =>
+      '<div class="session-pl-row">'
+      + '<div class="session-pl-name">' + esc(playlistDisplayName(pl)) + '</div>'
+      + '<div class="session-pl-count">' + n + ' track' + (n !== 1 ? 's' : '') + '</div>'
+      + '</div>'
+    ).join('');
+  }
+}
+
+async function exportXML() {
+  const resultEl = document.getElementById('export-result');
+  try {
+    const res  = await fetch('/api/export', {method: 'POST'});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    resultEl.innerHTML =
+      'Exportado <span>' + data.count + ' pista' + (data.count !== 1 ? 's' : '') + '</span> → <span>' + esc(data.file) + '</span>';
+    showToast('Exportado a ' + data.file);
+  } catch(e) {
+    resultEl.innerHTML = '<span style="color:#FF3D1A">' + esc(e.message) + '</span>';
+  }
+}
+
+// ---------------------------------------------------------------
+// SORT / MATCH
+// ---------------------------------------------------------------
+async function doMatch() {
+  const desc = document.getElementById('sort-textarea').value.trim();
+  if (!desc) return;
+  stopVoice('sort');
+  openSuggestionsDrawer();
+
+  const btn = document.getElementById('match-btn');
+  btn.textContent = 'Matching...';
+  btn.disabled    = true;
+  document.getElementById('results-area').innerHTML =
+    '<div class="matching-state">BUSCANDO<span class="krate-dots"><span>·</span><span>·</span><span>·</span></span></div>';
+
+  try {
+    const res  = await fetch('/api/match', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({description: desc, mode: state.mode})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderResults(data);
+  } catch(e) {
+    document.getElementById('results-area').innerHTML =
+      '<div class="err-state">' + esc(e.message) + '</div>';
+  } finally {
+    btn.textContent = 'Match';
+    btn.disabled    = false;
+  }
+}
+
+function renderResults(data) {
+  let suggestions = [];
+
+  if (state.mode === 'auto') {
+    if (data.playlist) suggestions = [{playlist: data.playlist, reason: data.reason}];
+  } else {
+    suggestions = data.suggestions || [];
+  }
+
+  if (!suggestions.length && !data.new_playlist) {
+    document.getElementById('results-area').innerHTML =
+      '<div class="no-match"><p>Sin coincidencias.<br><span style="color:#2A2A22">Describe con más detalle o asigna manualmente.</span></p></div>';
+    return;
+  }
+
+  let html = suggestions.map((s, i) =>
+    '<div class="result-card ' + (i === 0 ? 'best' : '') + '" id="res-' + i + '">'
+    + '<div class="result-rank ' + (i === 0 ? 'best' : '') + '">0' + (i + 1) + '</div>'
+    + '<div style="flex:1;min-width:0">'
+    + '<div class="result-name' + (i > 0 ? ' dim' : '') + '">' + esc(playlistDisplayName(s.playlist)) + '</div>'
+    + '<div class="result-why">' + esc(s.reason) + '</div>'
+    + '</div>'
+    + '<div class="result-actions">'
+    + '<div class="ra-btn place" onclick="placeTrack(' + i + ',\'' + esc(s.playlist).replace(/'/g,"\\'") + '\')">Colocar aquí</div>'
+    + '<div class="ra-btn skip" onclick="skipResult(' + i + ')">Omitir</div>'
+    + '</div></div>'
+  ).join('');
+
+  if (data.new_playlist) {
+    const np       = data.new_playlist;
+    const safeName = esc(np.name).replace(/'/g, "\\'");
+    const safeVibe = esc(np.vibe).replace(/'/g, "\\'");
+    html +=
+      '<div class="result-card result-card--create" id="res-new">'
+      + '<div class="result-rank" style="color:#6A6858">+</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="result-name" style="color:#9A9880">Crear: ' + esc(np.name) + '</div>'
+      + '<div class="result-why">' + esc(np.vibe) + '</div>'
+      + '</div>'
+      + '<div class="result-actions">'
+      + '<div class="ra-btn place" onclick="createAndPlaceTrack(\'' + safeName + '\',\'' + safeVibe + '\',\'inbox\')">Crear y colocar</div>'
+      + '</div></div>';
+  }
+
+  document.getElementById('results-area').innerHTML = html;
+  document.querySelectorAll('#results-area .result-card').forEach((card, i) => {
+    card.style.animationDelay = `${i * 70}ms`;
+  });
+}
+
+async function placeTrack(idx, playlist) {
+  if (!state.selected) {
+    showToast('Selecciona una pista primero');
+    return;
+  }
+
+  const card = document.getElementById('res-' + idx);
+  if (card) card.classList.add('done');
+
+  try {
+    await fetch('/api/assign', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({
+        track_id:       state.selected.id,
+        playlist,
+        name:           state.selected.name,
+        artist:         state.selected.artist,
+        bpm:            state.selected.bpm,
+        key:            state.selected.key,
+        source_playlist: state.selectedFrom || null,
+      })
+    });
+    state.session[state.selected.id] = {
+      playlist,
+      name:            state.selected.name,
+      artist:          state.selected.artist,
+      source_playlist: state.selectedFrom || null,
+    };
+    renderSessionPanel();
+    closeSuggestionsDrawer();
+    showToast('→ ' + playlistDisplayName(playlist));
+    document.getElementById('sort-textarea').value = '';
+    document.getElementById('results-area').innerHTML =
+      '<div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>';
+    state.lastPlaced = state.selected.id;
+    state.selected   = null;
+    const chip = document.getElementById('selected-chip');
+    if (chip) chip.classList.remove('visible');
+
+    // If we came from the inbox, refresh it in place; otherwise return to that playlist queue
+    if (state.selectedFrom === state.inbox) {
+      renderInboxTracks();
+    } else if (state.selectedFrom) {
+      openPlaylist(state.selectedFrom);
+    }
+  } catch(e) {
+    showToast('Error al colocar la pista');
+  }
+}
+
+function openSuggestionsDrawer() {
+  const d = document.getElementById('inbox-drawer');
+  if (d) d.classList.add('open');
+}
+function closeSuggestionsDrawer() {
+  const d = document.getElementById('inbox-drawer');
+  if (d) d.classList.remove('open');
+}
+
+function skipResult(idx) {
+  const card = document.getElementById('res-' + idx);
+  if (card) card.remove();
+}
+
+// Ctrl/Cmd+Enter to match
+document.getElementById('sort-textarea').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doMatch();
+});
+
+// Ctrl/Cmd+Enter in dialog, Escape to close
+document.getElementById('dialog-textarea').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doDialogMatch();
+  if (e.key === 'Escape') closeActionDialog();
+});
+document.getElementById('action-dialog').addEventListener('click', e => {
+  if (e.target === document.getElementById('action-dialog')) closeActionDialog();
+});
+
+// ---------------------------------------------------------------
+// COLUMN CONFIG
+// ---------------------------------------------------------------
+const COL_DEFS = {
+  name:     { label: 'PISTA',    grow: 2 },
+  artist:   { label: 'ARTISTA',  grow: 1 },
+  bpm:      { label: 'BPM',      grow: 0, basis: '64px' },
+  key:      { label: 'TONO',     grow: 0, basis: '52px' },
+  album:    { label: 'ÁLBUM',    grow: 1 },
+  genre:    { label: 'GÉNERO',   grow: 1 },
+  year:     { label: 'AÑO',      grow: 0, basis: '46px' },
+  duration: { label: 'DURACIÓN', grow: 0, basis: '64px' },
+};
+const COL_ORDER   = ['name','artist','bpm','key','album','genre','year','duration'];
+const COL_VISIBLE = new Set(['name','artist','bpm','key']);
+
+const INBOX_COL_DEFS = {
+  name:   { label: 'TÍTULO',    grow: 2 },
+  artist: { label: 'ARTISTA',   grow: 1 },
+  album:  { label: 'ÁLBUM',     grow: 1 },
+  bpm:    { label: 'BPM',       grow: 0, basis: '60px' },
+  key:    { label: 'TONALIDAD', grow: 0, basis: '80px' },
+  genre:  { label: 'GÉNERO',    grow: 1 },
+};
+const INBOX_COL_ORDER   = ['name','artist','album','bpm','key','genre'];
+const INBOX_COL_VISIBLE = new Set(['name','artist','album','bpm','key']);
+
+function loadColumnConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('krate_columns') || 'null');
+    if (saved && Array.isArray(saved) && saved.every(c => c.id && COL_DEFS[c.id])) {
+      const result = saved.map(c => ({ ...COL_DEFS[c.id], id: c.id, visible: !!c.visible }));
+      const savedIds = new Set(saved.map(c => c.id));
+      COL_ORDER.filter(id => !savedIds.has(id)).forEach(id =>
+        result.push({ ...COL_DEFS[id], id, visible: false })
+      );
+      return result;
+    }
+  } catch(e) {}
+  return COL_ORDER.map(id => ({ ...COL_DEFS[id], id, visible: COL_VISIBLE.has(id) }));
+}
+
+let columnConfig = loadColumnConfig();
+
+function saveColumnConfig() {
+  localStorage.setItem('krate_columns',
+    JSON.stringify(columnConfig.map(c => ({ id: c.id, visible: c.visible })))
+  );
+}
+
+function loadInboxColumnConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('krate_inbox_columns_v2') || 'null');
+    if (saved && Array.isArray(saved) && saved.every(c => c.id && INBOX_COL_DEFS[c.id])) {
+      const result = saved.map(c => ({ ...INBOX_COL_DEFS[c.id], id: c.id, visible: !!c.visible }));
+      const savedIds = new Set(saved.map(c => c.id));
+      INBOX_COL_ORDER.filter(id => !savedIds.has(id)).forEach(id =>
+        result.push({ ...INBOX_COL_DEFS[id], id, visible: false })
+      );
+      return result;
+    }
+  } catch(e) {}
+  return INBOX_COL_ORDER.map(id => ({ ...INBOX_COL_DEFS[id], id, visible: INBOX_COL_VISIBLE.has(id) }));
+}
+function saveInboxColumnConfig() {
+  localStorage.setItem('krate_inbox_columns_v2',
+    JSON.stringify(inboxColumnConfig.map(c => ({ id: c.id, visible: c.visible }))));
+}
+
+let inboxColumnConfig = loadInboxColumnConfig();
+let inboxSort = { col: null, dir: 'asc' };
+
+function applyGridStyle() {
+  const visible = columnConfig.filter(c => c.visible);
+  const tpl = visible.map(c => c.grow ? c.grow + 'fr' : (c.basis || 'auto')).join(' ');
+  let s = document.getElementById('dyn-grid-style');
+  if (!s) { s = document.createElement('style'); s.id = 'dyn-grid-style'; document.head.appendChild(s); }
+  s.textContent = `.col-header-row,.track-row{grid-template-columns:${tpl}}`;
+}
+
+function applyInboxGridStyle() {
+  const visible = inboxColumnConfig.filter(c => c.visible);
+  const tpl = visible.map(c => c.grow ? c.grow + 'fr' : (c.basis || 'auto')).join(' ');
+  let s = document.getElementById('inbox-grid-style');
+  if (!s) { s = document.createElement('style'); s.id = 'inbox-grid-style'; document.head.appendChild(s); }
+  s.textContent = `.inbox-col-header-row,#track-list .track-row{grid-template-columns:${tpl}}`;
+}
+
+function renderInboxColHeader() {
+  const el = document.getElementById('inbox-col-header');
+  if (!el) return;
+  const visible = inboxColumnConfig.filter(c => c.visible);
+  const row = document.createElement('div');
+  row.className = 'inbox-col-header-row';
+  visible.forEach(col => {
+    const cell = document.createElement('div');
+    cell.className = 'inbox-col-hdr' + (inboxSort.col === col.id ? ' sorted' : '');
+    const arrow = inboxSort.col === col.id ? (inboxSort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+    cell.textContent = col.label + arrow;
+    cell.onclick = () => toggleInboxSort(col.id);
+    row.appendChild(cell);
+  });
+  el.innerHTML = '';
+  el.appendChild(row);
+}
+
+function toggleInboxSort(colId) {
+  if (inboxSort.col === colId) {
+    inboxSort.dir = inboxSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    inboxSort.col = colId;
+    inboxSort.dir = 'asc';
+  }
+  renderInboxTracks();
+}
+
+function toggleInboxColPicker() {
+  const picker = document.getElementById('inbox-col-picker');
+  const btn    = document.getElementById('inbox-col-picker-btn');
+  if (!picker) return;
+  const isOpen = picker.style.display !== 'none';
+  picker.style.display = isOpen ? 'none' : '';
+  btn.classList.toggle('open', !isOpen);
+  if (!isOpen) renderInboxColPicker();
+}
+
+function renderInboxColPicker() {
+  const picker = document.getElementById('inbox-col-picker');
+  if (!picker) return;
+  const visibleCount = inboxColumnConfig.filter(c => c.visible).length;
+  picker.innerHTML = '<div class="col-picker-list">'
+    + inboxColumnConfig.map((col, i) => {
+        const locked = col.visible && visibleCount <= 1;
+        return '<label class="col-picker-item">'
+          + '<input type="checkbox" ' + (col.visible ? 'checked' : '') + (locked ? ' disabled' : '')
+          + ' onchange="setInboxColVisible(' + i + ',this.checked)">'
+          + '<span>' + esc(col.label) + '</span>'
+          + '</label>';
+      }).join('')
+    + '</div>';
+}
+
+function setInboxColVisible(i, v) {
+  inboxColumnConfig[i].visible = v;
+  saveInboxColumnConfig();
+  applyInboxGridStyle();
+  renderInboxColHeader();
+  renderInboxTracks();
+  renderInboxColPicker();
+}
+
+function getColValue(t, colId) {
+  switch(colId) {
+    case 'name':     return t.name    || '';
+    case 'artist':   return t.artist  || '';
+    case 'bpm':      return t.bpm ? t.bpm.replace(/\.00$/, '') : '';
+    case 'key':      return t.key     || '';
+    case 'album':    return t.album   || '';
+    case 'genre':    return t.genre   || '';
+    case 'year':     return t.year    || '';
+    case 'duration': return t.duration ? fmtTime(parseInt(t.duration, 10)) : '';
+    default:         return '';
+  }
+}
+
+let _dragColId = null;  // tracks which column is being dragged
+
+function renderColHeader() {
+  const el = document.getElementById('playlist-col-header');
+  if (!el) return;
+  const visible = columnConfig.filter(c => c.visible);
+  if (!visible.length) { el.innerHTML = ''; return; }
+
+  const row = document.createElement('div');
+  row.className = 'col-header-row';
+
+  visible.forEach(col => {
+    const cell = document.createElement('div');
+    cell.className = 'col-hdr';
+    cell.textContent = col.label;
+    cell.draggable = true;
+
+    cell.addEventListener('dragstart', e => {
+      _dragColId = col.id;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', col.id);
+      setTimeout(() => cell.classList.add('dragging'), 0);
+    });
+    cell.addEventListener('dragend', () => {
+      cell.classList.remove('dragging');
+      _dragColId = null;
+    });
+    cell.addEventListener('dragover', e => {
+      if (_dragColId && _dragColId !== col.id) { e.preventDefault(); cell.classList.add('drag-over'); }
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+    cell.addEventListener('drop', e => {
+      e.preventDefault();
+      cell.classList.remove('drag-over');
+      const fromId = e.dataTransfer.getData('text/plain');
+      if (fromId && fromId !== col.id) reorderColumn(fromId, col.id);
+    });
+
+    row.appendChild(cell);
+  });
+
+  el.innerHTML = '';
+  el.appendChild(row);
+}
+
+function reorderColumn(fromId, toId) {
+  const fi = columnConfig.findIndex(c => c.id === fromId);
+  const ti = columnConfig.findIndex(c => c.id === toId);
+  if (fi < 0 || ti < 0 || fi === ti) return;
+  const [moved] = columnConfig.splice(fi, 1);
+  columnConfig.splice(ti, 0, moved);
+  saveColumnConfig();
+  applyGridStyle();
+  renderColHeader();
+  if (state.currentPlaylistName) renderPlaylistDetailTracks(state.currentPlaylistName);
+}
+
+function toggleColPicker() {
+  const picker = document.getElementById('col-picker');
+  const btn    = document.getElementById('col-picker-btn');
+  if (!picker) return;
+  const isOpen = picker.style.display !== 'none';
+  picker.style.display = isOpen ? 'none' : '';
+  btn.classList.toggle('open', !isOpen);
+  if (!isOpen) renderColPicker();
+}
+
+function renderColPicker() {
+  const picker = document.getElementById('col-picker');
+  if (!picker) return;
+  const visibleCount = columnConfig.filter(c => c.visible).length;
+  picker.innerHTML = '<div class="col-picker-list">'
+    + columnConfig.map((col, i) => {
+        const locked = col.visible && visibleCount <= 1;
+        return '<label class="col-picker-item">'
+          + '<input type="checkbox" ' + (col.visible ? 'checked' : '') + (locked ? ' disabled' : '')
+          + ' onchange="setColVisible(' + i + ',this.checked)">'
+          + '<span>' + esc(col.label) + '</span>'
+          + '</label>';
+      }).join('')
+    + '</div>';
+}
+
+function setColVisible(idx, visible) {
+  columnConfig[idx].visible = visible;
+  saveColumnConfig();
+  applyGridStyle();
+  renderColHeader();
+  renderColPicker();
+  if (state.currentPlaylistName) renderPlaylistDetailTracks(state.currentPlaylistName);
+}
+
+// ---------------------------------------------------------------
+// PLAYLIST DETAIL PANEL
+// ---------------------------------------------------------------
+async function openPlaylist(name) {
+  showPanel('playlist');
+  state.currentPlaylistName = name;
+  state.selected = null;
+  document.getElementById('playlist-detail-name').textContent = playlistDisplayName(name);
+  document.getElementById('playlist-detail-count').textContent = '';
+  document.getElementById('playlist-detail-tracks').innerHTML =
+    '<div class="matching-state">Cargando...</div>';
+  document.getElementById('playlist-col-header').innerHTML = '';
+
+  try {
+    const res    = await fetch('/api/playlists/' + encodeURIComponent(name) + '/tracks');
+    const tracks = await res.json();
+    if (tracks.error) throw new Error(tracks.error);
+    state.playlistDetailTracks = tracks;
+    renderPlaylistDetailTracks(name);
+  } catch(e) {
+    document.getElementById('playlist-detail-tracks').innerHTML =
+      '<div class="err-state">' + esc(e.message) + '</div>';
+  }
+}
+
+function selectTrackFromPlaylist(id, playlistName) {
+  state.selectedFrom = playlistName;
+  selectTrackById(id);
+  if (state.selected) {
+    renderPlaylistDetailTracks(playlistName);
+    loadTrackInPlayer(state.selected);
+  }
+}
+
+function renderPlaylistDetailTracks(name) {
+  const tracks = state.playlistDetailTracks;
+  if (!tracks) return;
+
+  applyGridStyle();
+  renderColHeader();
+
+  const remaining = tracks.filter(t => !state.session[t.id]).length;
+  document.getElementById('playlist-detail-count').textContent =
+    tracks.length + ' pistas' + (remaining < tracks.length ? ' · ' + remaining + ' restantes' : '');
+
+  if (!tracks.length) {
+    document.getElementById('playlist-detail-tracks').innerHTML =
+      '<div class="manage-empty">Esta playlist no tiene pistas.</div>';
+    return;
+  }
+
+  const visible     = columnConfig.filter(c => c.visible);
+  const safePlaylist = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+  const html = tracks.map(t => {
+    const placed     = !!state.session[t.id];
+    const isSelected = state.selected && state.selected.id === t.id;
+    const active     = isSelected ? ' active' : '';
+    const style      = placed ? 'style="opacity:0.3;pointer-events:none"' : '';
+
+    let row = '<div class="track-row' + active + '" data-tid="' + esc(t.id) + '" ' + style
+      + ' onclick="selectTrackFromPlaylist(\'' + esc(t.id) + '\',\'' + safePlaylist + '\')">';
+
+    for (const col of visible) {
+      const val = getColValue(t, col.id);
+      const cls = col.id === 'name' ? 'track-row-name'
+                : col.id === 'artist' ? 'track-row-artist'
+                : 'track-row-cell';
+      row += '<div class="' + cls + '">' + esc(val) + '</div>';
+    }
+
+    if (isSelected) {
+      row += '<div class="track-row-actions" onclick="event.stopPropagation()">'
+        + '<button class="tr-action-btn" onclick="openDescribeDialog()">Describir</button>'
+        + '<button class="tr-action-btn move" onclick="openMoverDialog()">Mover</button>'
+        + '<button class="tr-action-btn del" onclick="eliminarConfirm(\'' + esc(t.id) + '\',\'' + safePlaylist + '\',this)">Eliminar</button>'
+        + '</div>';
+    }
+    row += '</div>';
+    return row;
+  }).join('');
+
+  document.getElementById('playlist-detail-tracks').innerHTML = html;
+}
+
+function eliminarConfirm(id, playlistName, btn) {
+  btn.textContent = '¿Confirmar?';
+  btn.style.background   = '#FF3D1A';
+  btn.style.color        = '#0A0908';
+  btn.style.borderColor  = '#FF3D1A';
+  btn.onclick = (e) => { e.stopPropagation(); eliminarFromView(id, playlistName); };
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'tr-action-btn del';
+  cancelBtn.textContent = 'Cancelar';
+  cancelBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    btn.textContent = 'Eliminar';
+    btn.style.background  = '';
+    btn.style.color       = '';
+    btn.style.borderColor = '';
+    btn.onclick = (e2) => { e2.stopPropagation(); eliminarConfirm(id, playlistName, btn); };
+    cancelBtn.remove();
+  });
+  btn.insertAdjacentElement('afterend', cancelBtn);
+}
+
+// ---------------------------------------------------------------
+// ACTION DIALOG
+// ---------------------------------------------------------------
+function openDescribeDialog() {
+  document.getElementById('dialog-title').textContent = 'DESCRIBIR PISTA';
+  document.getElementById('dialog-describe-section').style.display = 'flex';
+  document.getElementById('dialog-textarea').value = '';
+  document.getElementById('dialog-results-area').innerHTML =
+    '<div class="no-match"><p>Describe el vibe y presiona Coincidir.</p></div>';
+  const active = state.playlists.filter(p => !p.hidden && p.vibe && p.vibe.trim()).length;
+  document.getElementById('dialog-hint').textContent = active + ' playlists activas';
+  document.getElementById('action-dialog').classList.add('open');
+  setTimeout(() => document.getElementById('dialog-textarea').focus(), 50);
+}
+
+function openMoverDialog() {
+  document.getElementById('dialog-title').textContent = 'MOVER A PLAYLIST';
+  document.getElementById('dialog-describe-section').style.display = 'none';
+  const playlists = state.playlists.filter(p => !p.hidden);
+  const html = playlists.map((p, i) =>
+    '<div class="result-card" id="dres-' + i + '">'
+    + '<div style="flex:1;min-width:0"><div class="result-name">' + esc(playlistDisplayName(p.name)) + '</div>'
+    + (p.vibe ? '<div class="result-why">' + esc(p.vibe) + '</div>' : '') + '</div>'
+    + '<div class="result-actions"><div class="ra-btn place" onclick="placeFromDialog(-1,\'' + esc(p.name).replace(/'/g, "\\'") + '\')">Colocar aquí</div></div>'
+    + '</div>'
+  ).join('');
+  document.getElementById('dialog-results-area').innerHTML =
+    html || '<div class="no-match"><p>No hay playlists disponibles.</p></div>';
+  document.getElementById('action-dialog').classList.add('open');
+}
+
+function closeActionDialog() {
+  stopVoice('dialog');
+  document.getElementById('action-dialog').classList.remove('open');
+}
+
+async function doDialogMatch() {
+  const desc = document.getElementById('dialog-textarea').value.trim();
+  if (!desc) return;
+  stopVoice('dialog');
+
+  const btn = document.getElementById('dialog-match-btn');
+  btn.textContent = 'Matching...';
+  btn.disabled    = true;
+  document.getElementById('dialog-results-area').innerHTML =
+    '<div class="matching-state">BUSCANDO<span class="krate-dots"><span>·</span><span>·</span><span>·</span></span></div>';
+
+  try {
+    const res  = await fetch('/api/match', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({description: desc, mode: state.mode})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderDialogResults(data);
+  } catch(e) {
+    document.getElementById('dialog-results-area').innerHTML =
+      '<div class="err-state">' + esc(e.message) + '</div>';
+  } finally {
+    btn.textContent = 'Coincidir';
+    btn.disabled    = false;
+  }
+}
+
+function renderDialogResults(data) {
+  let suggestions = [];
+  if (state.mode === 'auto') {
+    if (data.playlist) suggestions = [{playlist: data.playlist, reason: data.reason}];
+  } else {
+    suggestions = data.suggestions || [];
+  }
+
+  if (!suggestions.length && !data.new_playlist) {
+    document.getElementById('dialog-results-area').innerHTML =
+      '<div class="no-match"><p>Sin coincidencias.</p></div>';
+    return;
+  }
+
+  let html = suggestions.map((s, i) =>
+    '<div class="result-card ' + (i === 0 ? 'best' : '') + '" id="dres-' + i + '">'
+    + '<div class="result-rank ' + (i === 0 ? 'best' : '') + '">0' + (i + 1) + '</div>'
+    + '<div style="flex:1;min-width:0">'
+    + '<div class="result-name' + (i > 0 ? ' dim' : '') + '">' + esc(playlistDisplayName(s.playlist)) + '</div>'
+    + '<div class="result-why">' + esc(s.reason) + '</div>'
+    + '</div>'
+    + '<div class="result-actions">'
+    + '<div class="ra-btn place" onclick="placeFromDialog(' + i + ',\'' + esc(s.playlist).replace(/'/g, "\\'") + '\')">Colocar aquí</div>'
+    + '<div class="ra-btn skip" onclick="document.getElementById(\'dres-' + i + '\').remove()">Omitir</div>'
+    + '</div></div>'
+  ).join('');
+
+  if (data.new_playlist) {
+    const np       = data.new_playlist;
+    const safeName = esc(np.name).replace(/'/g, "\\'");
+    const safeVibe = esc(np.vibe).replace(/'/g, "\\'");
+    html +=
+      '<div class="result-card result-card--create" id="dres-new">'
+      + '<div class="result-rank" style="color:#6A6858">+</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="result-name" style="color:#9A9880">Crear: ' + esc(np.name) + '</div>'
+      + '<div class="result-why">' + esc(np.vibe) + '</div>'
+      + '</div>'
+      + '<div class="result-actions">'
+      + '<div class="ra-btn place" onclick="createAndPlaceTrack(\'' + safeName + '\',\'' + safeVibe + '\',\'dialog\')">Crear y colocar</div>'
+      + '</div></div>';
+  }
+
+  document.getElementById('dialog-results-area').innerHTML = html;
+  document.querySelectorAll('#dialog-results-area .result-card').forEach((card, i) => {
+    card.style.animationDelay = `${i * 70}ms`;
+  });
+}
+
+async function placeFromDialog(idx, playlist) {
+  if (!state.selected) { showToast('Selecciona una pista primero'); return; }
+
+  if (idx >= 0) {
+    const card = document.getElementById('dres-' + idx);
+    if (card) card.classList.add('done');
+  }
+
+  try {
+    await fetch('/api/assign', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({
+        track_id:        state.selected.id,
+        playlist,
+        name:            state.selected.name,
+        artist:          state.selected.artist,
+        bpm:             state.selected.bpm,
+        key:             state.selected.key,
+        source_playlist: state.selectedFrom || null,
+      })
+    });
+    state.session[state.selected.id] = {
+      playlist,
+      name:            state.selected.name,
+      artist:          state.selected.artist,
+      source_playlist: state.selectedFrom || null,
+    };
+    state.selected = null;
+    renderSessionPanel();
+    showToast('→ ' + playlistDisplayName(playlist));
+    document.getElementById('dialog-textarea').value = '';
+    closeActionDialog();
+
+    if (state.selectedFrom === state.inbox) {
+      renderInboxTracks();
+    } else if (state.selectedFrom) {
+      renderPlaylistDetailTracks(state.selectedFrom);
+    }
+  } catch(e) {
+    showToast('Error al colocar la pista');
+  }
+}
+
+async function createAndPlaceTrack(name, vibe, ctx) {
+  if (!state.selected) { showToast('Selecciona una pista primero'); return; }
+  try {
+    const cr = await fetch('/api/playlists/create', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({name, vibe})
+    });
+    const crData = await cr.json();
+    if (crData.error) throw new Error(crData.error);
+
+    await fetch('/api/assign', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({
+        track_id:        state.selected.id,
+        playlist:        name,
+        name:            state.selected.name,
+        artist:          state.selected.artist,
+        bpm:             state.selected.bpm,
+        key:             state.selected.key,
+        source_playlist: state.selectedFrom || null,
+      })
+    });
+
+    state.session[state.selected.id] = {
+      playlist:        name,
+      name:            state.selected.name,
+      artist:          state.selected.artist,
+      source_playlist: state.selectedFrom || null,
+    };
+
+    await loadPlaylists();
+    renderSessionPanel();
+    showToast('Playlist creada → ' + name);
+
+    if (ctx === 'dialog') {
+      document.getElementById('dialog-textarea').value = '';
+      closeActionDialog();
+      if (state.selectedFrom === state.inbox) renderInboxTracks();
+      else if (state.selectedFrom) renderPlaylistDetailTracks(state.selectedFrom);
+      state.selected = null;
+    } else {
+      document.getElementById('sort-textarea').value = '';
+      if (state.selectedFrom === state.inbox) renderInboxTracks();
+      else if (state.selectedFrom) openPlaylist(state.selectedFrom);
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+function eliminarFromView(id, playlistName) {
+  state.playlistDetailTracks = state.playlistDetailTracks.filter(t => t.id !== id);
+  if (state.selected && state.selected.id === id) state.selected = null;
+  renderPlaylistDetailTracks(playlistName);
+}
+
+// ---------------------------------------------------------------
+// AUDIO PLAYER
+// ---------------------------------------------------------------
+const playerState = {
+  audioCtx:    null,
+  buffer:      null,
+  source:      null,
+  startTime:   0,
+  offset:      0,      // pause offset in seconds
+  playing:     false,
+  duration:    0,
+  trackId:     null,
+  rafId:       null,
+  loading:     false,
+  bpm:         0,
+  loadId:      0,      // incremented on each load to cancel stale loads
+};
+
+function fmtTime(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+function drawWaveform(buffer) {
+  const canvas = document.getElementById('waveform-canvas');
+  if (!canvas) return;
+  const wrap = document.getElementById('player-wave-wrap');
+  const dpr  = window.devicePixelRatio || 1;
+  const W    = canvas.width  = wrap.offsetWidth  * dpr;
+  const H    = canvas.height = wrap.offsetHeight * dpr;
+  const ctx  = canvas.getContext('2d');
+  const data = buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(data.length / W));
+  const mid  = H / 2;
+
+  ctx.fillStyle = '#0A0908';
+  ctx.fillRect(0, 0, W, H);
+
+  for (let x = 0; x < W; x++) {
+    let max = 0, min = 0;
+    const start = x * step;
+    const end   = Math.min(start + step, data.length);
+    for (let j = start; j < end; j++) {
+      if (data[j] > max) max = data[j];
+      if (data[j] < min) min = data[j];
+    }
+    const amp = 0.88;
+    ctx.fillStyle = '#3A3830';
+    // top half
+    ctx.fillRect(x / dpr * dpr, mid - max * mid * amp, 1, max * mid * amp);
+    // bottom (mirrored)
+    ctx.fillRect(x / dpr * dpr, mid, 1, -min * mid * amp);
+  }
+}
+
+function drawPlayhead() {
+  const canvas = document.getElementById('waveform-canvas');
+  if (!canvas || !playerState.buffer) return;
+
+  const elapsed = playerState.playing
+    ? (playerState.audioCtx.currentTime - playerState.startTime) + playerState.offset
+    : playerState.offset;
+
+  const pct  = Math.min(1, elapsed / playerState.duration);
+  const W    = canvas.width;
+  const H    = canvas.height;
+  const ctx  = canvas.getContext('2d');
+  const x    = Math.floor(pct * W);
+
+  // Redraw waveform then overlay playhead
+  drawWaveform(playerState.buffer);
+
+  // Played region tint
+  ctx.fillStyle = 'rgba(255,61,26,0.18)';
+  ctx.fillRect(0, 0, x, H);
+
+  // Playhead line
+  ctx.fillStyle = '#FF3D1A';
+  ctx.fillRect(x, 0, 1, H);
+
+  // Beat pulse — warm glow clipped to waveform bars, sweeps right one beat at a time
+  if (playerState.playing && playerState.bpm > 0) {
+    const beatInterval = 60 / playerState.bpm;
+    const beatPhase    = (elapsed % beatInterval) / beatInterval; // 0..1
+    const fadeIn       = Math.min(1, beatPhase * 12);             // soft ramp-up first ~8%
+    const fadeOut      = Math.pow(1 - beatPhase, 1.6);
+    const baseAlpha    = fadeIn * fadeOut * 0.50;
+
+    if (baseAlpha > 0.005) {
+      const travel = W * 0.10;
+      const spotX  = x + travel * beatPhase;
+      const glow   = W * 0.026;
+
+      const data = playerState.buffer.getChannelData(0);
+      const step = Math.max(1, Math.floor(data.length / W));
+      const mid  = H / 2;
+      const amp  = 0.88;
+
+      const pLeft  = Math.max(x + 1, Math.floor(spotX - glow * 1.5));
+      const pRight = Math.min(W - 1, Math.ceil(spotX + glow * 2));
+
+      for (let px = pLeft; px <= pRight; px++) {
+        const dist = (px - spotX) / glow;
+        const a    = baseAlpha * Math.exp(-dist * dist);
+        if (a < 0.008) continue;
+        const si = px * step;
+        const ei = Math.min(si + step, data.length);
+        let maxV = 0, minV = 0;
+        for (let j = si; j < ei; j++) {
+          if (data[j] > maxV) maxV = data[j];
+          if (data[j] < minV) minV = data[j];
+        }
+        ctx.fillStyle = `rgba(255,185,80,${a.toFixed(3)})`;
+        ctx.fillRect(px, mid - maxV * mid * amp, 1, maxV * mid * amp);
+        ctx.fillRect(px, mid, 1, -minV * mid * amp);
+      }
+    }
+  }
+
+  // Time label
+  const timeEl = document.getElementById('player-time');
+  if (timeEl) timeEl.textContent = fmtTime(elapsed) + ' / ' + fmtTime(playerState.duration);
+
+  if (playerState.playing) {
+    playerState.rafId = requestAnimationFrame(drawPlayhead);
+  }
+}
+
+async function loadTrackInPlayer(track) {
+  if (!track || !track.id) return;
+
+  // Stop current playback
+  stopPlayer();
+  const myLoadId = ++playerState.loadId;
+  playerState.loading  = true;
+  playerState.trackId  = track.id;
+  playerState.offset   = 0;
+  playerState.bpm      = parseFloat(track.bpm) || 0;
+
+  // Update UI immediately
+  document.getElementById('player-meta-empty').style.display  = 'none';
+  document.getElementById('player-meta-name').style.display   = '';
+  document.getElementById('player-meta-artist').style.display = '';
+  const nameEl   = document.getElementById('player-meta-name');
+  const artistEl = document.getElementById('player-meta-artist');
+  nameEl.classList.add('changing');
+  artistEl.classList.add('changing');
+  setTimeout(() => {
+    nameEl.textContent   = track.name;
+    artistEl.textContent = track.artist;
+    nameEl.classList.remove('changing');
+    artistEl.classList.remove('changing');
+  }, 200);
+  document.getElementById('player-play-btn').disabled         = true;
+  document.getElementById('player-time').textContent          = '—';
+
+  // Album art
+  const artImg = document.getElementById('player-art-img');
+  const artPh  = document.getElementById('player-art-ph');
+  artImg.style.display = 'none';
+  artPh.style.display  = '';
+  const testArt = new Image();
+  testArt.onload = () => {
+    artImg.src           = testArt.src;
+    artImg.style.display = '';
+    artPh.style.display  = 'none';
+  };
+  testArt.src = '/api/track/' + encodeURIComponent(track.id) + '/art';
+
+  // Init AudioContext (must be created after user gesture)
+  if (!playerState.audioCtx) {
+    playerState.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  try {
+    const res  = await fetch('/api/track/' + encodeURIComponent(track.id) + '/audio');
+    if (!res.ok) throw new Error('No se pudo cargar el audio');
+    const buf  = await res.arrayBuffer();
+    const decoded = await playerState.audioCtx.decodeAudioData(buf);
+    if (myLoadId !== playerState.loadId) return;  // another track was clicked, abort
+    playerState.buffer   = decoded;
+    playerState.duration = decoded.duration;
+    const wc = document.getElementById('waveform-canvas');
+    wc.classList.remove('drawn');
+    wc.classList.add('wf-loading');     // snap opacity to 0, no transition
+    drawWaveform(decoded);
+    void wc.offsetWidth;                // commit the reset
+    wc.classList.remove('wf-loading');  // re-enable transitions
+    requestAnimationFrame(() => wc.classList.add('drawn'));
+    document.getElementById('player-time').textContent =
+      fmtTime(0) + ' / ' + fmtTime(decoded.duration);
+    document.getElementById('player-play-btn').disabled = false;
+    playerState.loading = false;
+    startPlayback();
+  } catch(e) {
+    console.error('Player error:', e);
+    document.getElementById('player-time').textContent = 'Error';
+    playerState.loading = false;
+  }
+}
+
+function startPlayback() {
+  if (!playerState.buffer || !playerState.audioCtx) return;
+  const src = playerState.audioCtx.createBufferSource();
+  src.buffer = playerState.buffer;
+  src.connect(playerState.audioCtx.destination);
+  src.start(0, playerState.offset);
+  playerState.source    = src;
+  src.onended = () => {
+    // Only react to natural track end — not to stop() called by stopPlayer/seek
+    if (playerState.source === src) {
+      playerState.source  = null;
+      playerState.playing = false;
+      playerState.offset  = 0;
+      updatePlayBtn();
+      drawPlayhead();
+    }
+  };
+  playerState.startTime = playerState.audioCtx.currentTime;
+  playerState.playing   = true;
+  updatePlayBtn();
+  cancelAnimationFrame(playerState.rafId);
+  playerState.rafId = requestAnimationFrame(drawPlayhead);
+}
+
+function stopPlayer() {
+  const src = playerState.source;
+  playerState.source = null;  // null first so onended sees null and skips cleanup
+  if (src) {
+    try { src.stop(); } catch(e) {}
+  }
+  cancelAnimationFrame(playerState.rafId);
+  playerState.playing = false;
+  updatePlayBtn();
+}
+
+function togglePlay() {
+  if (!playerState.buffer) return;
+  if (playerState.playing) {
+    // Pause: save offset
+    playerState.offset = Math.min(
+      playerState.duration,
+      (playerState.audioCtx.currentTime - playerState.startTime) + playerState.offset
+    );
+    stopPlayer();
+    drawPlayhead();
+  } else {
+    startPlayback();
+  }
+}
+
+function updatePlayBtn() {
+  const btn = document.getElementById('player-play-btn');
+  if (btn) btn.textContent = playerState.playing ? '⏸' : '▶';
+}
+
+// Waveform click → seek
+document.getElementById('waveform-canvas').addEventListener('click', e => {
+  if (!playerState.buffer) return;
+  const ratio = e.offsetX / e.currentTarget.offsetWidth;
+  playerState.offset = ratio * playerState.duration;
+  const wasPlaying = playerState.playing;
+  stopPlayer();
+  if (wasPlaying) startPlayback();
+  else drawPlayhead();
+});
+
+// ---------------------------------------------------------------
+// VOICE RECOGNITION
+// ---------------------------------------------------------------
+const voiceState = {
+  sort:   { lang: 'es-US', rec: null, listening: false },
+  dialog: { lang: 'es-US', rec: null, listening: false }
+};
+
+(function initVoiceSupport() {
+  if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+    document.querySelectorAll('.voice-controls').forEach(el => el.style.display = 'none');
+  }
+})();
+
+function toggleVoice(ctx) {
+  voiceState[ctx].listening ? stopVoice(ctx) : startVoice(ctx);
+}
+
+function startVoice(ctx) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+
+  const other = ctx === 'sort' ? 'dialog' : 'sort';
+  if (voiceState[other].listening) stopVoice(other);
+
+  const textareaId = ctx === 'dialog' ? 'dialog-textarea' : 'sort-textarea';
+  const btnId      = ctx === 'dialog' ? 'dialog-voice-btn' : 'sort-voice-btn';
+
+  // Immediate click feedback — show the user something happened
+  const btn = document.getElementById(btnId);
+  btn.textContent = '● ...';
+  btn.disabled = true;
+
+  const rec = new SR();
+  rec.lang            = voiceState[ctx].lang;
+  rec.interimResults  = true;
+  rec.continuous      = true;
+  rec.maxAlternatives = 1;
+  voiceState[ctx].rec = rec;
+
+  let baseText = '';
+
+  rec.onstart = () => {
+    voiceState[ctx].listening = true;
+    const ta = document.getElementById(textareaId);
+    baseText = ta.value;
+    if (baseText && !baseText.endsWith(' ')) baseText += ' ';
+    btn.disabled = false;
+    btn.classList.add('listening');
+    btn.textContent = '⏹ Parar';
+  };
+
+  rec.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      e.results[i].isFinal
+        ? (final   += e.results[i][0].transcript)
+        : (interim += e.results[i][0].transcript);
+    }
+    document.getElementById(textareaId).value = baseText + final + interim;
+    if (final) baseText += final;
+  };
+
+  rec.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      showToast('Permite el acceso al micrófono en la barra del navegador');
+    } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      showToast('Error de micrófono: ' + e.error);
+      console.warn('Voice error:', e.error);
+    }
+    stopVoice(ctx);
+  };
+
+  rec.onend = () => stopVoice(ctx);
+
+  try {
+    rec.start();
+  } catch(err) {
+    showToast('No se pudo iniciar el micrófono');
+    stopVoice(ctx);
+  }
+}
+
+function stopVoice(ctx) {
+  if (voiceState[ctx].rec) {
+    try { voiceState[ctx].rec.stop(); } catch(e) {}
+    voiceState[ctx].rec = null;
+  }
+  voiceState[ctx].listening = false;
+  const btnId = ctx === 'dialog' ? 'dialog-voice-btn' : 'sort-voice-btn';
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = false; btn.classList.remove('listening'); btn.textContent = '⏺ Hablar'; }
+}
+
+function setVoiceLang(lang, ctx) {
+  voiceState[ctx].lang = lang;
+  const ctrlId = ctx === 'dialog' ? 'dialog-voice-controls' : 'sort-voice-controls';
+  document.getElementById(ctrlId).querySelectorAll('.voice-lang-btn')
+    .forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+  if (voiceState[ctx].listening) { stopVoice(ctx); startVoice(ctx); }
+}
+
+// ---------------------------------------------------------------
+// REJECT FROM INBOX
+// ---------------------------------------------------------------
+const REJECTED_PLAYLIST = 'no deseados';
+
+async function rejectInboxTrack(id) {
+  const t = state.inboxTracks.find(tr => tr.id === id);
+  if (!t) return;
+
+  if (!state.playlists.find(p => p.name === REJECTED_PLAYLIST)) {
+    await fetch('/api/playlists/create', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ name: REJECTED_PLAYLIST, vibe: 'Canciones rechazadas del inbox' })
+    });
+    await loadPlaylists();
+  }
+
+  await fetch('/api/assign', {
+    method:  'POST',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({
+      track_id:        id,
+      playlist:        REJECTED_PLAYLIST,
+      name:            t.name,
+      artist:          t.artist,
+      bpm:             t.bpm,
+      key:             t.key,
+      source_playlist: state.inbox || null,
+    })
+  });
+
+  state.session[id] = {
+    playlist:        REJECTED_PLAYLIST,
+    name:            t.name,
+    artist:          t.artist,
+    source_playlist: state.inbox || null,
+  };
+
+  state.selected = null;
+  const chip = document.getElementById('selected-chip');
+  if (chip) chip.classList.remove('visible');
+
+  renderSessionPanel();
+  renderInboxTracks();
+  showToast('✕ no deseados');
+}
+
+async function unassignTrack(id) {
+  try {
+    await fetch('/api/unassign', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ track_id: id })
+    });
+    delete state.session[id];
+    renderSessionPanel();
+    renderInboxTracks();
+    showToast('↩ Restaurada');
+  } catch(e) {
+    showToast('Error al restaurar');
+  }
+}
+
+// ---------------------------------------------------------------
+// XML PICKER
+// ---------------------------------------------------------------
+async function openXmlModal() {
+  document.getElementById('xml-dialog').classList.add('open');
+  document.getElementById('xml-dialog-result').innerHTML = '';
+  try {
+    const res  = await fetch('/api/xml-info');
+    const data = await res.json();
+    document.getElementById('xml-current-name').textContent = data.filename || '—';
+  } catch(e) {}
+}
+
+function closeXmlModal() {
+  document.getElementById('xml-dialog').classList.remove('open');
+}
+
+async function handleXmlFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('xml-file-label').textContent = file.name;
+  document.getElementById('xml-upload-label-el').classList.add('has-file');
+
+  const resultEl = document.getElementById('xml-dialog-result');
+  resultEl.innerHTML = '<div class="matching-state">Cargando...</div>';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res  = await fetch('/api/set-xml', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    document.getElementById('xml-current-name').textContent = data.filename;
+    resultEl.innerHTML = '<div class="export-result">XML → <span>' + esc(data.filename) + '</span></div>';
+    showToast('XML actualizado');
+    await loadAll();
+  } catch(e) {
+    resultEl.innerHTML = '<div class="err-state">' + esc(e.message) + '</div>';
+  }
+}
+
+async function submitXmlPath() {
+  const path = (document.getElementById('xml-path-input').value || '').trim();
+  if (!path) return;
+  const resultEl = document.getElementById('xml-dialog-result');
+  resultEl.innerHTML = '<div class="matching-state">Verificando...</div>';
+  try {
+    const res  = await fetch('/api/set-xml', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ path })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    document.getElementById('xml-current-name').textContent = data.filename;
+    document.getElementById('xml-path-input').value = '';
+    resultEl.innerHTML = '<div class="export-result">XML → <span>' + esc(data.filename) + '</span></div>';
+    showToast('XML actualizado');
+    await loadAll();
+  } catch(e) {
+    resultEl.innerHTML = '<div class="err-state">' + esc(e.message) + '</div>';
+  }
+}
+
+document.getElementById('xml-dialog').addEventListener('click', e => {
+  if (e.target === document.getElementById('xml-dialog')) closeXmlModal();
+});
+
+// ---------------------------------------------------------------
+// INIT
+// ---------------------------------------------------------------
+applyInboxGridStyle();
+loadAll();
+</script>
+</body>
+</html>

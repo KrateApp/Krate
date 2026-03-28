@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import flask; print\\(''Flask'', flask.__version__\\)\")",
+      "Bash(pip install:*)",
+      "Bash(python -c \":*)",
+      "Bash(start python:*)",
+      "Bash(curl -s http://localhost:5000/api/stats)",
+      "Bash(start http://localhost:5000)"
+    ]
+  }
+}

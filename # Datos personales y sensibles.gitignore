@@ -1,0 +1,16 @@
+# Datos personales y sensibles
+.env
+Rekordbox.xml
+Rekordbox_krate.xml
+playlist_vibes.json
+
+# Archivos que Python genera automáticamente
+__pycache__/
+*.pyc
+*.pyo
+
+# Carpetas de herramientas
+.claude/
+
+# Windows
+Thumbs.db

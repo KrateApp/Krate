@@ -1,0 +1,4 @@
+flask
+anthropic
+mutagen
+python-dotenv
