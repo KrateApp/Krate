@@ -228,9 +228,6 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .inbox-restore-hint { color: #3A3830; font-size: 10px; margin-left: 6px; letter-spacing: 0.5px; transition: color 150ms ease; }
 .inbox-placed:hover .inbox-restore-hint { color: #9A9880; }
 
-/* xml picker */
-.xml-change-btn{display:block;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #1A1914;color:#2A2A22;font-size:9px;letter-spacing:2px;padding:0 0 8px;cursor:pointer;margin-bottom:8px;transition:color .1s}
-.xml-change-btn:hover{color:#6A6858}
 
 /* 1. Place track — card slide-out */
 @keyframes krate-card-out {
@@ -408,6 +405,8 @@ body{font-family:var(--font-sans,system-ui);margin:0}
     <div class="topbar-mode">
       <div class="mode-pill active" onclick="setMode('review',this)">Revisión</div>
       <div class="mode-pill" onclick="setMode('auto',this)">Auto</div>
+      <div class="topbar-sep" style="margin:0 4px"></div>
+      <div class="mode-pill" onclick="openXmlModal()">XML</div>
     </div>
   </div>
 
@@ -432,7 +431,6 @@ body{font-family:var(--font-sans,system-ui);margin:0}
     <div id="sidebar-playlists"></div>
 
     <div class="sidebar-footer">
-      <button class="xml-change-btn" onclick="openXmlModal()">CAMBIAR XML</button>
       <div id="sidebar-footer-content">
         <div class="sidebar-footer-stat" style="color:#FF3D1A;opacity:0.4">v0.4 · Phase 3</div>
       </div>
@@ -662,9 +660,6 @@ function playlistDisplayName(internalName) {
   return (pl && pl.custom_name) ? pl.custom_name : displayName(internalName);
 }
 
-function isCPT(name) {
-  return /\bCPT\b/.test(displayName(name));
-}
 
 function esc(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -936,12 +931,8 @@ function renderSidebar() {
   _sidebarFilledDots = new Set(active.filter(p => p.vibe && p.vibe.trim()).map(p => p.name));
   document.getElementById('sidebar-playlists').innerHTML = html;
 
-  const masCount = active.filter(p => !isCPT(p.name)).length;
-  const cptCount = active.filter(p => isCPT(p.name)).length;
   document.getElementById('sidebar-footer-content').innerHTML =
-    '<div class="sidebar-footer-stat">MASMASMAS: <span>' + masCount + '</span></div>' +
-    '<div class="sidebar-footer-stat">CPT: <span>' + cptCount + '</span></div>' +
-    '<div class="sidebar-footer-stat" style="margin-top:6px;color:#FF3D1A;opacity:0.4">v0.4 · Fase 3</div>';
+    '<div class="sidebar-footer-stat" style="color:#FF3D1A;opacity:0.4">v0.4 · Fase 3</div>';
 }
 
 function selectInboxTrack(id) {
@@ -2534,6 +2525,16 @@ document.getElementById('xml-dialog').addEventListener('click', e => {
   if (e.target === document.getElementById('xml-dialog')) closeXmlModal();
 });
 
+async function checkXmlOnStartup() {
+  try {
+    const res  = await fetch('/api/xml-info');
+    const data = await res.json();
+    if (!data.exists) openXmlModal();
+  } catch(e) {
+    openXmlModal();
+  }
+}
+
 async function checkAudioServer() {
   try {
     await fetch(AUDIO_BASE + '/ping', { signal: AbortSignal.timeout(2000) });
@@ -2549,6 +2550,7 @@ async function checkAudioServer() {
 applyInboxGridStyle();
 loadAll();
 checkAudioServer();
+checkXmlOnStartup();
 </script>
 </body>
 </html>
