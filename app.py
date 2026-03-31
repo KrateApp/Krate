@@ -627,5 +627,15 @@ def set_xml_route():
     return jsonify({"ok": True, "filename": os.path.basename(path)})
 
 
+@app.route("/download/krate_audio.bat")
+def download_bat():
+    return send_file("krate_audio.bat", as_attachment=True)
+
+
+@app.route("/download/krate_audio.py")
+def download_py():
+    return send_file("krate_audio.py", as_attachment=True)
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

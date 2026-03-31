@@ -99,4 +99,9 @@ if __name__ == "__main__":
     print("║   Escuchando en localhost:5001       ║")
     print("║   Deja esta ventana abierta          ║")
     print("╚══════════════════════════════════════╝\n")
+    if not os.path.exists(XML_PATH):
+        print("  AVISO: No se encontro Rekordbox.xml en esta carpeta.")
+        print("  Copia tu Rekordbox.xml aqui para que el audio funcione:")
+        print(f"  {BASE}")
+        print()
     app.run(host="127.0.0.1", port=5001, debug=False)

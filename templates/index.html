@@ -433,6 +433,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
     <div class="sidebar-footer">
       <div id="sidebar-footer-content">
         <div class="sidebar-footer-stat" style="color:#FF3D1A;opacity:0.4">v0.4 · Phase 3</div>
+        <div style="margin-top:6px"><span style="font-size:10px;color:#3A3830;cursor:pointer;letter-spacing:1px" onclick="openWelcomeModal()">VER INSTRUCCIONES</span></div>
       </div>
     </div>
   </div>
@@ -591,6 +592,41 @@ body{font-family:var(--font-sans,system-ui);margin:0}
     <div class="results-label">SUGERENCIAS</div>
     <div id="dialog-results-area">
       <div class="no-match"><p>Describe el vibe y presiona Coincidir.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- WELCOME MODAL -->
+<div id="welcome-modal" class="dialog-overlay">
+  <div class="dialog-box" style="width:480px;max-width:90vw">
+    <div class="sort-label" style="margin-bottom:16px">BIENVENIDO A KRATE</div>
+    <p style="color:#C8C4B8;font-size:13px;line-height:1.8;margin-bottom:20px">
+      Antes de empezar, necesitas hacer 3 cosas:
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+      <div style="background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px 16px">
+        <div style="color:#FF3D1A;font-size:10px;letter-spacing:2px;margin-bottom:8px">PASO 1</div>
+        <div style="color:#C8C4B8;font-size:13px;margin-bottom:10px">Descarga el servidor de audio local</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="/download/krate_audio.bat" download style="font-size:11px;letter-spacing:1px;padding:5px 12px;background:#FF3D1A;color:#fff;border-radius:3px;text-decoration:none">krate_audio.bat</a>
+          <a href="/download/krate_audio.py" download style="font-size:11px;letter-spacing:1px;padding:5px 12px;background:#1A1914;color:#9A9880;border-radius:3px;text-decoration:none">krate_audio.py</a>
+        </div>
+        <div style="color:#6A6858;font-size:11px;margin-top:8px">Guarda ambos archivos en la misma carpeta, junto con tu Rekordbox.xml</div>
+      </div>
+      <div style="background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px 16px">
+        <div style="color:#FF3D1A;font-size:10px;letter-spacing:2px;margin-bottom:8px">PASO 2</div>
+        <div style="color:#C8C4B8;font-size:13px">Exporta tu librería de Rekordbox</div>
+        <div style="color:#6A6858;font-size:11px;margin-top:6px">Rekordbox → File → Export Collection in xml format → guarda el archivo como <span style="color:#9A9880">Rekordbox.xml</span> en la misma carpeta que los archivos del paso 1</div>
+      </div>
+      <div style="background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px 16px">
+        <div style="color:#FF3D1A;font-size:10px;letter-spacing:2px;margin-bottom:8px">PASO 3</div>
+        <div style="color:#C8C4B8;font-size:13px">Abre el servidor de audio</div>
+        <div style="color:#6A6858;font-size:11px;margin-top:6px">Haz doble clic en <span style="color:#9A9880">krate_audio.bat</span> y deja esa ventana abierta mientras usas Krate</div>
+      </div>
+    </div>
+    <button onclick="completeSetup()" class="pl-inline-save" style="width:100%;padding:10px;font-size:12px;letter-spacing:2px">LISTO, YA TENGO TODO CORRIENDO</button>
+    <div style="text-align:center;margin-top:12px">
+      <span style="color:#6A6858;font-size:11px;cursor:pointer;text-decoration:underline" onclick="completeSetup()">Saltar — ya configuré antes</span>
     </div>
   </div>
 </div>
@@ -2459,6 +2495,19 @@ async function unassignTrack(id) {
 }
 
 // ---------------------------------------------------------------
+// WELCOME MODAL
+// ---------------------------------------------------------------
+function completeSetup() {
+  localStorage.setItem('krate_ready', '1');
+  document.getElementById('welcome-modal').classList.remove('open');
+  checkXmlOnStartup();
+}
+
+function openWelcomeModal() {
+  localStorage.removeItem('krate_ready');
+  document.getElementById('welcome-modal').classList.add('open');
+}
+
 // XML PICKER
 // ---------------------------------------------------------------
 async function openXmlModal() {
@@ -2550,7 +2599,11 @@ async function checkAudioServer() {
 applyInboxGridStyle();
 loadAll();
 checkAudioServer();
-checkXmlOnStartup();
+if (!localStorage.getItem('krate_ready')) {
+  document.getElementById('welcome-modal').classList.add('open');
+} else {
+  checkXmlOnStartup();
+}
 </script>
 </body>
 </html>

@@ -27,6 +27,8 @@ echo  Servidor de audio corriendo en localhost:5001
 echo  Deja esta ventana abierta mientras usas Krate.
 echo  Para detener el servidor cierra esta ventana.
 echo.
+echo  Abre Krate en: https://krate-production.up.railway.app
+echo.
 
 :: Correr el servidor de audio
 python "%~dp0krate_audio.py"
