@@ -639,6 +639,38 @@ def set_xml_route():
     return jsonify({"ok": True, "filename": os.path.basename(path)})
 
 
+@app.route("/api/vibes")
+def get_vibes():
+    return jsonify(load_vibes())
+
+
+@app.route("/api/vibes/export")
+def export_vibes():
+    vibes = load_vibes()
+    return Response(
+        json.dumps(vibes, indent=2, ensure_ascii=False),
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=krate_vibes.json"}
+    )
+
+
+@app.route("/api/vibes/import", methods=["POST"])
+def import_vibes():
+    if "file" not in request.files:
+        return jsonify({"error": "No se proporcionó archivo"}), 400
+    f = request.files["file"]
+    if not f.filename.lower().endswith(".json"):
+        return jsonify({"error": "Solo se aceptan archivos .json"}), 400
+    try:
+        data = json.loads(f.read().decode("utf-8"))
+    except Exception:
+        return jsonify({"error": "Archivo JSON inválido"}), 400
+    if not isinstance(data, dict):
+        return jsonify({"error": "Formato incorrecto"}), 400
+    save_vibes(data)
+    return jsonify({"ok": True})
+
+
 @app.route("/download/krate_audio.bat")
 def download_bat():
     return send_file("krate_audio.bat", as_attachment=True)

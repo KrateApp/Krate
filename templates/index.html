@@ -391,6 +391,18 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .player-meta-artist.changing {
   opacity: 0;
 }
+
+/* vibes history tabs */
+.vibes-tab-bar{display:flex;gap:4px;margin-bottom:10px}
+.vibes-tab{font-size:10px;padding:4px 12px;border-radius:3px;cursor:pointer;letter-spacing:1px;border:1px solid #1A1914;color:#6A6858;background:transparent;transition:all .15s}
+.vibes-tab:hover{border-color:#333;color:#888}
+.vibes-tab.active{border-color:#FF3D1A;color:#FF3D1A}
+.vibes-history-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+.vibes-snap-row{background:#060605;border:1px solid #1A1914;border-radius:3px;padding:8px 10px;display:flex;align-items:center;gap:8px}
+.vibes-snap-ts{font-size:10px;color:#6A6858;flex:1;letter-spacing:0.5px}
+.vibes-snap-restore{font-size:10px;padding:3px 9px;border-radius:3px;cursor:pointer;letter-spacing:0.5px;border:1px solid #2A1510;color:#FF3D1A;background:transparent;transition:all .1s;white-space:nowrap}
+.vibes-snap-restore:hover{background:#FF3D1A;color:#0A0908}
+.vibes-empty{font-size:11px;color:#3A3830;font-style:italic;padding:8px 0}
 </style>
 </head>
 <body>
@@ -524,6 +536,10 @@ body{font-family:var(--font-sans,system-ui);margin:0}
       </div>
       <div class="session-actions" id="session-actions" style="display:none">
         <button class="btn-primary" onclick="exportXML()">Exportar a Rekordbox</button>
+        <div style="margin-top:10px;padding:10px 12px;background:#0E0D0B;border:1px solid #1A1914;border-radius:3px;font-size:11px;color:#6A6858;line-height:1.6">
+          Antes de cerrar, guarda tus descripciones de vibe — se pierden si el servidor reinicia.<br>
+          <span style="color:#FF3D1A;cursor:pointer;text-decoration:underline" onclick="openXmlModal()">Exportar vibes.json →</span>
+        </div>
       </div>
       <div class="export-result" id="export-result"></div>
     </div>
@@ -656,6 +672,26 @@ body{font-family:var(--font-sans,system-ui);margin:0}
       </div>
     </div>
     <div id="xml-dialog-result"></div>
+    <div style="border-top:1px solid #1A1914;padding-top:14px;margin-top:2px">
+      <div class="sort-label" style="margin-bottom:8px">VIBES</div>
+      <div style="font-size:11px;color:#6A6858;margin-bottom:10px">Tus descripciones de vibe se guardan en el servidor, pero se pierden si Railway reinicia. Guarda tu archivo vibes.json localmente.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="pl-inline-save" style="flex:1" onclick="exportVibes()">Exportar vibes.json</button>
+        <label class="pl-inline-save" style="flex:1;text-align:center;cursor:pointer;margin:0">
+          Importar vibes.json
+          <input type="file" accept=".json" style="display:none" onchange="importVibes(this)">
+        </label>
+        <button class="pl-inline-save" onclick="manualSaveVibes()">Guardar ahora</button>
+      </div>
+      <div id="vibes-io-result" style="font-size:11px;color:#6A6858;margin-bottom:10px;min-height:16px"></div>
+      <div class="sort-label" style="margin-bottom:8px">HISTORIAL LOCAL</div>
+      <div class="vibes-tab-bar">
+        <button class="vibes-tab active" id="vibes-tab-auto" onclick="switchVibesTab('auto')">Auto-guardados</button>
+        <button class="vibes-tab" id="vibes-tab-manual" onclick="switchVibesTab('manual')">Guardados manuales</button>
+      </div>
+      <div id="vibes-history-auto" class="vibes-history-list"></div>
+      <div id="vibes-history-manual" class="vibes-history-list" style="display:none"></div>
+    </div>
   </div>
 </div>
 
@@ -680,6 +716,11 @@ const state = {
 };
 
 const AUDIO_BASE = 'http://localhost:5001';
+
+const VIBES_AUTO_KEY   = 'krate_vibes_auto';
+const VIBES_MANUAL_KEY = 'krate_vibes_manual';
+const VIBES_AUTO_MAX   = 5;
+const VIBES_MANUAL_MAX = 10;
 
 // ---------------------------------------------------------------
 // HELPERS
@@ -1310,6 +1351,21 @@ function renderSessionPanel() {
 async function exportXML() {
   const resultEl = document.getElementById('export-result');
   try {
+    // Abrir el file picker PRIMERO, antes de cualquier await de red,
+    // para que siga dentro del contexto del gesto del usuario (click).
+    let fileHandle = null;
+    if (window.showSaveFilePicker) {
+      try {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: 'Rekordbox_krate.xml',
+          types: [{ description: 'XML', accept: {'application/xml': ['.xml']} }],
+        });
+      } catch (err) {
+        if (err.name === 'AbortError') return; // usuario canceló
+        throw err;
+      }
+    }
+
     const res = await fetch('/api/export', {method: 'POST'});
     if (!res.ok) {
       const data = await res.json();
@@ -1319,20 +1375,11 @@ async function exportXML() {
     const blob  = await res.blob();
 
     let savedName = 'Rekordbox_krate.xml';
-    if (window.showSaveFilePicker) {
-      try {
-        const fh = await window.showSaveFilePicker({
-          suggestedName: 'Rekordbox_krate.xml',
-          types: [{ description: 'XML', accept: {'application/xml': ['.xml']} }],
-        });
-        savedName = fh.name;
-        const writable = await fh.createWritable();
-        await writable.write(blob);
-        await writable.close();
-      } catch (err) {
-        if (err.name === 'AbortError') return; // usuario canceló
-        throw err;
-      }
+    if (fileHandle) {
+      savedName = fileHandle.name;
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
     } else {
       // Fallback: descarga automática a la carpeta de Descargas
       const url = URL.createObjectURL(blob);
@@ -2548,10 +2595,113 @@ async function openXmlModal() {
     const data = await res.json();
     document.getElementById('xml-current-name').textContent = data.filename || '—';
   } catch(e) {}
+  renderVibesHistory();
 }
 
 function closeXmlModal() {
   document.getElementById('xml-dialog').classList.remove('open');
+}
+
+function formatVibesTs(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('es-ES', {
+    day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit'
+  }).replace(',', ' ·');
+}
+
+async function snapshotVibes(storageKey, maxCount) {
+  try {
+    const res = await fetch('/api/vibes');
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    list.unshift({ ts: new Date().toISOString(), data });
+    if (list.length > maxCount) list.length = maxCount;
+    localStorage.setItem(storageKey, JSON.stringify(list));
+  } catch(e) { console.warn('vibes snapshot failed', e); }
+}
+
+async function autoSaveVibes() {
+  await snapshotVibes(VIBES_AUTO_KEY, VIBES_AUTO_MAX);
+}
+
+async function manualSaveVibes() {
+  await snapshotVibes(VIBES_MANUAL_KEY, VIBES_MANUAL_MAX);
+  renderVibesHistory();
+  showToast('Guardado manual completado');
+}
+
+async function restoreVibes(dataObj) {
+  if (!dataObj) { showToast('Error: snapshot inválido'); return; }
+  try {
+    const blob = new Blob([JSON.stringify(dataObj, null, 2)], { type: 'application/json' });
+    const file = new File([blob], 'krate_vibes.json', { type: 'application/json' });
+    const fd   = new FormData();
+    fd.append('file', file);
+    const res  = await fetch('/api/vibes/import', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error al restaurar');
+    showToast('Vibes restauradas');
+    loadPlaylists();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+function vibesSnapData(storageKey, index) {
+  const list = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  return list[index] ? list[index].data : null;
+}
+
+function renderVibesHistory() {
+  function buildList(storageKey, containerId) {
+    const list = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const el   = document.getElementById(containerId);
+    if (!el) return;
+    if (list.length === 0) {
+      el.innerHTML = '<div class="vibes-empty">Sin guardados aún.</div>';
+      return;
+    }
+    el.innerHTML = list.map((snap, i) => `
+      <div class="vibes-snap-row">
+        <span class="vibes-snap-ts">${formatVibesTs(snap.ts)}</span>
+        <button class="vibes-snap-restore" onclick="restoreVibes(vibesSnapData('${storageKey}',${i}))">Restaurar</button>
+      </div>
+    `).join('');
+  }
+  buildList(VIBES_AUTO_KEY,   'vibes-history-auto');
+  buildList(VIBES_MANUAL_KEY, 'vibes-history-manual');
+}
+
+function switchVibesTab(tab) {
+  document.getElementById('vibes-tab-auto').classList.toggle('active',   tab === 'auto');
+  document.getElementById('vibes-tab-manual').classList.toggle('active', tab === 'manual');
+  document.getElementById('vibes-history-auto').style.display   = tab === 'auto'   ? 'flex' : 'none';
+  document.getElementById('vibes-history-manual').style.display = tab === 'manual' ? 'flex' : 'none';
+}
+
+function exportVibes() {
+  window.location.href = '/api/vibes/export';
+}
+
+async function importVibes(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const resultEl = document.getElementById('vibes-io-result');
+  resultEl.textContent = 'Importando...';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/vibes/import', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al importar');
+    resultEl.style.color = '#9A9880';
+    resultEl.textContent = 'Vibes importadas correctamente.';
+    loadPlaylists();
+  } catch(e) {
+    resultEl.style.color = '#FF3D1A';
+    resultEl.textContent = e.message;
+  }
+  input.value = '';
 }
 
 async function handleXmlFile(input) {
@@ -2629,6 +2779,7 @@ async function checkAudioServer() {
 applyInboxGridStyle();
 loadAll();
 checkAudioServer();
+setInterval(autoSaveVibes, 3 * 60 * 1000);
 if (!localStorage.getItem('krate_ready')) {
   document.getElementById('welcome-modal').classList.add('open');
 } else {
