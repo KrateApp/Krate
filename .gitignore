@@ -9,6 +9,13 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Assets y referencias no relacionados al repo
+_misc/
+
+# Archivos de API key locales
+*.env
+Krate API Key.env
+
 # Carpetas de herramientas
 .claude/
 
