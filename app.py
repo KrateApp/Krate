@@ -492,9 +492,20 @@ def export_xml():
     if not session_assignments:
         return jsonify({"error": "No assignments to export"}), 400
 
-    tree = ET.parse(get_xml_path())
+    xml_path = get_xml_path()
+    if not xml_path or not os.path.exists(xml_path):
+        return jsonify({"error": "XML no encontrado. Sube tu Rekordbox.xml antes de exportar."}), 400
+
+    try:
+        tree = ET.parse(xml_path)
+    except ET.ParseError as e:
+        return jsonify({"error": f"XML inválido: {e}"}), 400
+
     root = tree.getroot()
-    playlists_root = root.find("PLAYLISTS")[0]  # ROOT node
+    playlists_node = root.find("PLAYLISTS")
+    if playlists_node is None or len(playlists_node) == 0:
+        return jsonify({"error": "El XML no tiene nodo PLAYLISTS válido."}), 400
+    playlists_root = playlists_node[0]  # ROOT node
 
     placed = 0
     for track_id, info in session_assignments.items():
@@ -540,18 +551,21 @@ def export_xml():
         for child in playlist_nodes:
             playlists_root.append(child)
 
-    import io
-    buf = io.StringIO()
-    tree.write(buf, encoding="unicode", xml_declaration=True)
-    xml_bytes = buf.getvalue().encode("utf-8")
-    return Response(
-        xml_bytes,
-        mimetype="application/xml",
-        headers={
-            "Content-Disposition": 'attachment; filename="Rekordbox_krate.xml"',
-            "X-Krate-Count": str(placed),
-        }
-    )
+    try:
+        import io
+        buf = io.StringIO()
+        tree.write(buf, encoding="unicode", xml_declaration=True)
+        xml_bytes = buf.getvalue().encode("utf-8")
+        return Response(
+            xml_bytes,
+            mimetype="application/xml",
+            headers={
+                "Content-Disposition": 'attachment; filename="Rekordbox_krate.xml"',
+                "X-Krate-Count": str(placed),
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": f"Error al generar XML: {e}"}), 500
 
 
 def location_to_path(location):
