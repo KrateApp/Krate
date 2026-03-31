@@ -1418,6 +1418,12 @@ async function doMatch() {
       body:    JSON.stringify({description: desc, mode: state.mode})
     });
     const data = await res.json();
+    if (data.error === 'overloaded') {
+      document.getElementById('results-area').innerHTML =
+        '<div class="no-match"><p>' + esc(data.message) + '</p>'
+        + '<button class="btn-primary" style="margin-top:12px;font-size:11px;padding:6px 14px" onclick="doMatch()">Reintentar</button></div>';
+      return;
+    }
     if (data.error) throw new Error(data.error);
     renderResults(data);
   } catch(e) {
@@ -1976,6 +1982,12 @@ async function doDialogMatch() {
       body:    JSON.stringify({description: desc, mode: state.mode})
     });
     const data = await res.json();
+    if (data.error === 'overloaded') {
+      document.getElementById('dialog-results-area').innerHTML =
+        '<div class="no-match"><p>' + esc(data.message) + '</p>'
+        + '<button class="btn-primary" style="margin-top:12px;font-size:11px;padding:6px 14px" onclick="doDialogMatch()">Reintentar</button></div>';
+      return;
+    }
     if (data.error) throw new Error(data.error);
     renderDialogResults(data);
   } catch(e) {

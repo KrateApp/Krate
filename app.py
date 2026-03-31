@@ -182,6 +182,8 @@ def do_match():
         import anthropic
         if isinstance(e, anthropic.AuthenticationError):
             return jsonify({"error": "API key inválida. Verifica ANTHROPIC_API_KEY en Railway."}), 500
+        if isinstance(e, anthropic.APIStatusError) and e.status_code == 529:
+            return jsonify({"error": "overloaded", "message": "La API de Anthropic está saturada. Intenta de nuevo en unos segundos."}), 529
         return jsonify({"error": str(e)}), 500
 
 
