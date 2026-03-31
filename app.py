@@ -175,8 +175,14 @@ def do_match():
     if not active_vibes:
         return jsonify({"error": "No vibes set up yet"}), 400
 
-    result = match_vibe(description, active_vibes, mode=mode)
-    return jsonify(result)
+    try:
+        result = match_vibe(description, active_vibes, mode=mode)
+        return jsonify(result)
+    except Exception as e:
+        import anthropic
+        if isinstance(e, anthropic.AuthenticationError):
+            return jsonify({"error": "API key inválida. Verifica ANTHROPIC_API_KEY en Railway."}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/playlists/reorder", methods=["POST"])
