@@ -789,12 +789,14 @@ async function loadPlaylists() {
 async function loadInbox() {
   try {
     const res  = await fetch('/api/inbox');
+    if (!res.ok) throw new Error('inbox ' + res.status);
     const data = await res.json();
     state.inbox       = data.name || null;
     state.inboxTracks = data.tracks || [];
     renderInboxPanel();
   } catch(e) {
     console.error('inbox error', e);
+    renderInboxPanel();
   }
 }
 

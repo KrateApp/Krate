@@ -342,8 +342,11 @@ def get_inbox():
     inbox_name = vibes.get("_inbox")
     if not inbox_name:
         return jsonify({"name": None, "tracks": []})
+    xml_path = get_xml_path()
+    if not os.path.exists(xml_path):
+        return jsonify({"name": None, "tracks": []})
     try:
-        tree = ET.parse(get_xml_path())
+        tree = ET.parse(xml_path)
         root = tree.getroot()
         track_map = {}
         for t in root.find("COLLECTION"):
