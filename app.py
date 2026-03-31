@@ -617,6 +617,8 @@ def xml_info():
 
 @app.route("/api/set-xml", methods=["POST"])
 def set_xml_route():
+    global session_assignments, session_modified_playlists
+
     # Option A: file upload
     if "file" in request.files:
         f = request.files["file"]
@@ -628,6 +630,8 @@ def set_xml_route():
         vibes = load_vibes()
         vibes["_xml_path"] = save_path
         save_vibes(vibes)
+        session_assignments = {}
+        session_modified_playlists = set()
         return jsonify({"ok": True, "filename": fname})
 
     # Option B: path string
@@ -642,6 +646,8 @@ def set_xml_route():
     vibes = load_vibes()
     vibes["_xml_path"] = path
     save_vibes(vibes)
+    session_assignments = {}
+    session_modified_playlists = set()
     return jsonify({"ok": True, "filename": os.path.basename(path)})
 
 
