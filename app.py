@@ -335,10 +335,27 @@ def get_playlist_tracks(name):
             return jsonify({"error": "Playlist not found"}), 404
 
         tracks = []
+        xml_track_ids = set()
         for entry in node.findall("TRACK"):
             tid = entry.get("Key")
             if tid in track_map:
                 tracks.append(track_map[tid])
+                xml_track_ids.add(tid)
+
+        # Inject session-assigned tracks not yet in XML
+        for tid, info in session_assignments.items():
+            if info.get("playlist") == name and tid not in xml_track_ids:
+                tracks.append({
+                    "id":           tid,
+                    "name":         info.get("name", ""),
+                    "artist":       info.get("artist", ""),
+                    "bpm":          info.get("bpm", ""),
+                    "key":          info.get("key", ""),
+                    "album":        "", "year": "", "duration": "",
+                    "genre":        "", "location": "",
+                    "session_new":  True,
+                })
+
         return jsonify(tracks)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

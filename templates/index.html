@@ -161,6 +161,26 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .playlist-detail-count{font-size:11px;color:#6A6858}
 #playlist-detail-tracks{flex:1;overflow-y:auto}
 #panel-playlist{overflow:hidden}
+
+/* session-new track rows */
+.track-row.session-new{border-left:2px solid #FF3D1A !important}
+.track-row.session-new .track-row-name::after{
+  content:'nuevo';font-size:8px;letter-spacing:1px;color:#FF3D1A;
+  margin-left:8px;opacity:0.7;vertical-align:middle;
+}
+
+/* playlist title pulse on new track added */
+@keyframes pl-title-pop {
+  0%   { transform:scale(1);    text-shadow:none; }
+  15%  { transform:scale(0.96); text-shadow:none; }
+  40%  { transform:scale(1.01); text-shadow:0 0 18px rgba(255,61,26,0.55), 0 0 40px rgba(255,61,26,0.2); }
+  70%  { transform:scale(1);    text-shadow:0 0 30px rgba(255,61,26,0.15); }
+  100% { transform:scale(1);    text-shadow:none; }
+}
+#playlist-detail-name.pl-title-pop {
+  animation: pl-title-pop 600ms cubic-bezier(0.34,1.56,0.64,1) forwards;
+  display:inline-block;
+}
 /* column picker toggle */
 .pl-col-btn{font-size:10px;margin-left:auto;background:transparent;border:1px solid #1A1914;border-radius:3px;color:#3A3830;cursor:pointer;padding:2px 8px;letter-spacing:0.5px;transition:all .1s;flex-shrink:0}
 .pl-col-btn:hover{border-color:#333;color:#888}
@@ -1435,6 +1455,16 @@ async function doMatch() {
   }
 }
 
+function pulsePlaylistTitle(playlist) {
+  if (state.currentPlaylistName !== playlist) return;
+  const el = document.getElementById('playlist-detail-name');
+  if (!el) return;
+  el.classList.remove('pl-title-pop');
+  void el.offsetWidth;
+  el.classList.add('pl-title-pop');
+  el.addEventListener('animationend', () => el.classList.remove('pl-title-pop'), {once: true});
+}
+
 function renderResults(data) {
   let suggestions = [];
 
@@ -1522,6 +1552,8 @@ async function placeTrack(idx, playlist) {
       '<div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>';
     state.lastPlaced = state.selected.id;
     state.selected   = null;
+
+    pulsePlaylistTitle(playlist);
     const chip = document.getElementById('selected-chip');
     if (chip) chip.classList.remove('visible');
 
@@ -1878,10 +1910,12 @@ function renderPlaylistDetailTracks(name) {
   const html = tracks.map(t => {
     const placed     = !!state.session[t.id];
     const isSelected = state.selected && state.selected.id === t.id;
+    const isNew      = !!t.session_new;
     const active     = isSelected ? ' active' : '';
+    const newCls     = isNew ? ' session-new' : '';
     const style      = placed ? 'style="opacity:0.3;pointer-events:none"' : '';
 
-    let row = '<div class="track-row' + active + '" data-tid="' + esc(t.id) + '" ' + style
+    let row = '<div class="track-row' + active + newCls + '" data-tid="' + esc(t.id) + '" ' + style
       + ' onclick="selectTrackFromPlaylist(\'' + esc(t.id) + '\',\'' + safePlaylist + '\')">';
 
     for (const col of visible) {
@@ -2081,6 +2115,7 @@ async function placeFromDialog(idx, playlist) {
     showToast('→ ' + playlistDisplayName(playlist));
     document.getElementById('dialog-textarea').value = '';
     closeActionDialog();
+    pulsePlaylistTitle(playlist);
 
     if (state.selectedFrom === state.inbox) {
       renderInboxTracks();
