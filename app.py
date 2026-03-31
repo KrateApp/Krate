@@ -515,9 +515,18 @@ def export_xml():
         for child in playlist_nodes:
             playlists_root.append(child)
 
-    out_path = os.path.join(BASE, "Rekordbox_krate.xml")
-    tree.write(out_path, encoding="unicode", xml_declaration=True)
-    return jsonify({"file": "Rekordbox_krate.xml", "count": placed})
+    import io
+    buf = io.StringIO()
+    tree.write(buf, encoding="unicode", xml_declaration=True)
+    xml_bytes = buf.getvalue().encode("utf-8")
+    return Response(
+        xml_bytes,
+        mimetype="application/xml",
+        headers={
+            "Content-Disposition": 'attachment; filename="Rekordbox_krate.xml"',
+            "X-Krate-Count": str(placed),
+        }
+    )
 
 
 def location_to_path(location):

@@ -1310,12 +1310,40 @@ function renderSessionPanel() {
 async function exportXML() {
   const resultEl = document.getElementById('export-result');
   try {
-    const res  = await fetch('/api/export', {method: 'POST'});
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    const res = await fetch('/api/export', {method: 'POST'});
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Error al exportar');
+    }
+    const count = parseInt(res.headers.get('X-Krate-Count') || '0');
+    const blob  = await res.blob();
+
+    let savedName = 'Rekordbox_krate.xml';
+    if (window.showSaveFilePicker) {
+      try {
+        const fh = await window.showSaveFilePicker({
+          suggestedName: 'Rekordbox_krate.xml',
+          types: [{ description: 'XML', accept: {'application/xml': ['.xml']} }],
+        });
+        savedName = fh.name;
+        const writable = await fh.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } catch (err) {
+        if (err.name === 'AbortError') return; // usuario canceló
+        throw err;
+      }
+    } else {
+      // Fallback: descarga automática a la carpeta de Descargas
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href = url; a.download = 'Rekordbox_krate.xml'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
     resultEl.innerHTML =
-      'Exportado <span>' + data.count + ' pista' + (data.count !== 1 ? 's' : '') + '</span> → <span>' + esc(data.file) + '</span>';
-    showToast('Exportado a ' + data.file);
+      'Exportado <span>' + count + ' pista' + (count !== 1 ? 's' : '') + '</span> → <span>' + esc(savedName) + '</span>';
+    showToast('Exportado: ' + savedName);
   } catch(e) {
     resultEl.innerHTML = '<span style="color:#FF3D1A">' + esc(e.message) + '</span>';
   }
