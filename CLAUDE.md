@@ -1,6 +1,6 @@
 # KRATE — Contexto para Claude Code
 > Este archivo es la memoria del proyecto. Léelo completo antes de tocar cualquier archivo.
-> Actualizado: marzo 2026 · v0.4 · Fase 3 completa / Fase 4 iniciando
+> Actualizado: marzo 2026 · v0.5 · Fase 4 activa
 
 ---
 
@@ -127,7 +127,7 @@ __pycache__/
 - [x] Razonamiento visible — la IA explica por qué sugiere cada playlist
 - [x] Sugerencia de nueva playlist cuando nada encaja
 - [x] Sesión activa — asignaciones en memoria durante la sesión
-- [x] Exportación a Rekordbox_krate.xml
+- [x] Exportación a Rekordbox_krate.xml con file picker (el usuario elige dónde guardar)
 
 ### UI/UX
 - [x] Dashboard Flask single-file (templates/index.html)
@@ -141,6 +141,8 @@ __pycache__/
 - [x] Track deletion con confirmación
 - [x] Toast notifications
 - [x] Panel de sesión con lista de asignaciones + playlists modificadas
+- [x] Historial de vibes por track en localStorage con auto-guardado
+- [x] Onboarding para usuarios nuevos (primera vez sin XML)
 
 ### Producción
 - [x] Deployado en Railway
@@ -161,7 +163,8 @@ __pycache__/
   - Matching state: puntos animados "BUSCANDO · · ·"
 
 ### Fase 4 — Prueba real (CURRENT)
-- [ ] Onboarding de 2-5 DJs beta
+- [x] Onboarding para usuarios nuevos implementado
+- [ ] Onboarding de 2-5 DJs beta (distribución en curso)
 - [ ] Documentar bugs y casos borde en uso real
 - [ ] Ajuste fino de prompts según feedback
 - [ ] Evaluar si el flujo de XML upload es claro para usuarios no técnicos

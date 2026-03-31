@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 from flask import Flask, jsonify, request, render_template, send_file, Response
@@ -153,6 +154,14 @@ def set_vibe(playlist):
     return jsonify({"ok": True})
 
 
+def _display_name(raw_name, names_map):
+    """Return a clean display name for a playlist, suitable for the AI prompt."""
+    name = names_map.get(raw_name) or raw_name
+    name = re.sub(r'^MASMASMAS\s*[-\u2013]\s*', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'\s*\(\d+\)\s*$', '', name)
+    return name.strip()
+
+
 @app.route("/api/match", methods=["POST"])
 def do_match():
     # Lazy import so Anthropic client is only created on first match call
@@ -165,18 +174,35 @@ def do_match():
     if not description:
         return jsonify({"error": "No description provided"}), 400
 
-    vibes = load_vibes()
-    active_vibes = {
-        k: v for k, v in vibes.items()
-        if k != "_ignored" and not k.startswith("_")
-        and isinstance(v, str) and v.strip() and v != "SKIP"
-    }
+    vibes     = load_vibes()
+    names_map = vibes.get("_names", {})
+    ignored   = vibes.get("_ignored", [])
+
+    # Build active_vibes with clean display names for the AI prompt
+    active_vibes = {}
+    for k, v in vibes.items():
+        if k.startswith("_") or not isinstance(v, str) or not v.strip() or v == "SKIP":
+            continue
+        if k in ignored:
+            continue
+        active_vibes[_display_name(k, names_map)] = v
+
+    # Reverse map: display_name → internal_name (for resolving Claude's response)
+    reverse_map = {_display_name(k, names_map): k for k in vibes if not k.startswith("_")}
 
     if not active_vibes:
         return jsonify({"error": "No vibes set up yet"}), 400
 
     try:
         result = match_vibe(description, active_vibes, mode=mode)
+        # Resolve display names back to internal names
+        if mode == "auto":
+            pl = result.get("playlist", "")
+            result["playlist"] = reverse_map.get(pl, pl)
+        else:
+            for s in result.get("suggestions", []):
+                pl = s.get("playlist", "")
+                s["playlist"] = reverse_map.get(pl, pl)
         return jsonify(result)
     except Exception as e:
         import anthropic
