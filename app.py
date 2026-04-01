@@ -710,6 +710,38 @@ def set_xml_route():
     return jsonify({"ok": True, "filename": os.path.basename(path)})
 
 
+@app.route("/api/startup", methods=["POST"])
+def startup():
+    global session_assignments, session_modified_playlists
+
+    if "xml" not in request.files:
+        return jsonify({"error": "Se requiere el archivo XML"}), 400
+    xml_file = request.files["xml"]
+    if not xml_file.filename.lower().endswith(".xml"):
+        return jsonify({"error": "Solo se aceptan archivos .xml"}), 400
+
+    xml_fname = os.path.basename(xml_file.filename) or "Rekordbox_custom.xml"
+    xml_save  = os.path.join(BASE, xml_fname)
+    xml_file.save(xml_save)
+
+    if "vibes" in request.files:
+        try:
+            vibes_data = json.loads(request.files["vibes"].read().decode("utf-8"))
+            if not isinstance(vibes_data, dict):
+                vibes_data = {}
+        except Exception:
+            vibes_data = {}
+    else:
+        vibes_data = {}
+
+    vibes_data["_xml_path"] = xml_save
+    save_vibes(vibes_data)
+    session_assignments        = {}
+    session_modified_playlists = set()
+
+    return jsonify({"ok": True, "filename": xml_fname})
+
+
 @app.route("/api/vibes")
 def get_vibes():
     return jsonify(load_vibes())

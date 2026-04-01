@@ -301,6 +301,9 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .xml-upload-label{display:block;background:#060605;border:1px dashed #1A1914;border-radius:4px;padding:14px;cursor:pointer;font-size:11px;color:#3A3830;text-align:center;transition:border-color .1s,color .1s}
 .xml-upload-label:hover{border-color:#333;color:#6A6858}
 .xml-upload-label.has-file{border-color:#FF3D1A;color:#9A9880}
+.startup-upload-zone{display:block;background:#060605;border:1px dashed #1A1914;border-radius:4px;padding:14px;cursor:pointer;font-size:11px;color:#3A3830;text-align:center;transition:border-color .1s,color .1s}
+.startup-upload-zone:hover{border-color:#333;color:#6A6858}
+.startup-upload-zone.has-file{border-color:#FF3D1A;color:#9A9880}
 
 /* toast */
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(16px);background:#E8E4DA;color:#0A0908;font-size:11px;padding:8px 16px;border-radius:3px;letter-spacing:1px;opacity:0;transition:opacity 200ms ease,transform 250ms cubic-bezier(0.16,1,0.3,1);pointer-events:none;z-index:999}
@@ -464,8 +467,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 
     <div class="sidebar-footer">
       <div id="sidebar-footer-content">
-        <div class="sidebar-footer-stat" style="color:#FF3D1A;opacity:0.4">v0.4 · Phase 3</div>
-        <div style="margin-top:6px"><span style="font-size:10px;color:#3A3830;cursor:pointer;letter-spacing:1px" onclick="openWelcomeModal()">VER INSTRUCCIONES</span></div>
+        <div class="sidebar-footer-stat" style="color:#FF3D1A;opacity:0.4">v0.5 · Phase 4</div>
       </div>
     </div>
   </div>
@@ -632,38 +634,39 @@ body{font-family:var(--font-sans,system-ui);margin:0}
   </div>
 </div>
 
-<!-- WELCOME MODAL -->
-<div id="welcome-modal" class="dialog-overlay">
-  <div class="dialog-box" style="width:480px;max-width:90vw">
-    <div class="sort-label" style="margin-bottom:16px">BIENVENIDO A KRATE</div>
-    <p style="color:#C8C4B8;font-size:13px;line-height:1.8;margin-bottom:20px">
-      Antes de empezar, necesitas hacer 3 cosas:
-    </p>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
-      <div style="background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px 16px">
-        <div style="color:#FF3D1A;font-size:10px;letter-spacing:2px;margin-bottom:8px">PASO 1</div>
-        <div style="color:#C8C4B8;font-size:13px;margin-bottom:10px">Descarga el servidor de audio local</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a href="/download/krate_audio.bat" download style="font-size:11px;letter-spacing:1px;padding:5px 12px;background:#FF3D1A;color:#fff;border-radius:3px;text-decoration:none">krate_audio.bat</a>
-          <a href="/download/krate_audio.py" download style="font-size:11px;letter-spacing:1px;padding:5px 12px;background:#1A1914;color:#9A9880;border-radius:3px;text-decoration:none">krate_audio.py</a>
+<!-- STARTUP IMPORT MODAL -->
+<div id="startup-modal" class="dialog-overlay open">
+  <div class="dialog-box" style="width:460px;max-width:90vw">
+    <div class="sort-label" style="margin-bottom:4px">KRATE</div>
+    <div style="font-size:11px;color:#6A6858;margin-bottom:20px;letter-spacing:1px">Importa tus archivos para comenzar la sesión</div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div class="sort-label" style="margin-bottom:8px">
+          REKORDBOX XML
+          <span style="font-size:9px;color:#FF3D1A;letter-spacing:1px;margin-left:6px">REQUERIDO</span>
         </div>
-        <div style="color:#6A6858;font-size:11px;margin-top:8px">Guarda ambos archivos en la misma carpeta, junto con tu Rekordbox.xml</div>
+        <label class="startup-upload-zone" id="startup-xml-zone">
+          <input type="file" id="startup-xml-input" accept=".xml" style="display:none" onchange="startupHandleXml(this)">
+          <span id="startup-xml-label">Seleccionar Rekordbox.xml...</span>
+        </label>
       </div>
-      <div style="background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px 16px">
-        <div style="color:#FF3D1A;font-size:10px;letter-spacing:2px;margin-bottom:8px">PASO 2</div>
-        <div style="color:#C8C4B8;font-size:13px">Exporta tu librería de Rekordbox</div>
-        <div style="color:#6A6858;font-size:11px;margin-top:6px">Rekordbox → File → Export Collection in xml format → guarda el archivo como <span style="color:#9A9880">Rekordbox.xml</span> en la misma carpeta que los archivos del paso 1</div>
-      </div>
-      <div style="background:#060605;border:1px solid #1A1914;border-radius:4px;padding:12px 16px">
-        <div style="color:#FF3D1A;font-size:10px;letter-spacing:2px;margin-bottom:8px">PASO 3</div>
-        <div style="color:#C8C4B8;font-size:13px">Abre el servidor de audio</div>
-        <div style="color:#6A6858;font-size:11px;margin-top:6px">Haz doble clic en <span style="color:#9A9880">krate_audio.bat</span> y deja esa ventana abierta mientras usas Krate</div>
+
+      <div>
+        <div class="sort-label" style="margin-bottom:8px">
+          PLAYLIST VIBES JSON
+          <span style="font-size:9px;color:#6A6858;letter-spacing:1px;margin-left:6px">OPCIONAL</span>
+        </div>
+        <label class="startup-upload-zone" id="startup-vibes-zone" style="border-color:#1A1914">
+          <input type="file" id="startup-vibes-input" accept=".json" style="display:none" onchange="startupHandleVibes(this)">
+          <span id="startup-vibes-label">Seleccionar playlist_vibes.json...</span>
+        </label>
+        <div style="font-size:10px;color:#3A3830;margin-top:6px;letter-spacing:0.5px">Si no tienes uno, Krate empezará con configuración vacía</div>
       </div>
     </div>
-    <button onclick="completeSetup()" class="pl-inline-save" style="width:100%;padding:10px;font-size:12px;letter-spacing:2px">LISTO, YA TENGO TODO CORRIENDO</button>
-    <div style="text-align:center;margin-top:12px">
-      <span style="color:#6A6858;font-size:11px;cursor:pointer;text-decoration:underline" onclick="completeSetup()">Saltar — ya configuré antes</span>
-    </div>
+
+    <div id="startup-result" style="min-height:20px;font-size:11px;color:#6A6858;margin-top:12px"></div>
+    <button id="startup-btn" class="btn-primary" style="width:100%;padding:10px;font-size:12px;letter-spacing:2px;opacity:0.4;cursor:not-allowed;margin-top:4px" disabled onclick="startupSubmit()">INICIAR SESIÓN</button>
   </div>
 </div>
 
@@ -694,23 +697,15 @@ body{font-family:var(--font-sans,system-ui);margin:0}
     <div id="xml-dialog-result"></div>
     <div style="border-top:1px solid #1A1914;padding-top:14px;margin-top:2px">
       <div class="sort-label" style="margin-bottom:8px">VIBES</div>
-      <div style="font-size:11px;color:#6A6858;margin-bottom:10px">Tus descripciones de vibe se guardan en el servidor, pero se pierden si Railway reinicia. Guarda tu archivo vibes.json localmente.</div>
+      <div style="font-size:11px;color:#6A6858;margin-bottom:10px">Las vibes se pierden al cerrar el navegador. Exporta tu archivo vibes.json al finalizar la sesión.</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <button class="pl-inline-save" style="flex:1" onclick="exportVibes()">Exportar vibes.json</button>
         <label class="pl-inline-save" style="flex:1;text-align:center;cursor:pointer;margin:0">
           Importar vibes.json
           <input type="file" accept=".json" style="display:none" onchange="importVibes(this)">
         </label>
-        <button class="pl-inline-save" onclick="manualSaveVibes()">Guardar ahora</button>
       </div>
       <div id="vibes-io-result" style="font-size:11px;color:#6A6858;margin-bottom:10px;min-height:16px"></div>
-      <div class="sort-label" style="margin-bottom:8px">HISTORIAL LOCAL</div>
-      <div class="vibes-tab-bar">
-        <button class="vibes-tab active" id="vibes-tab-auto" onclick="switchVibesTab('auto')">Auto-guardados</button>
-        <button class="vibes-tab" id="vibes-tab-manual" onclick="switchVibesTab('manual')">Guardados manuales</button>
-      </div>
-      <div id="vibes-history-auto" class="vibes-history-list"></div>
-      <div id="vibes-history-manual" class="vibes-history-list" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -736,11 +731,6 @@ const state = {
 };
 
 const AUDIO_BASE = 'http://localhost:5001';
-
-const VIBES_AUTO_KEY   = 'krate_vibes_auto';
-const VIBES_MANUAL_KEY = 'krate_vibes_manual';
-const VIBES_AUTO_MAX   = 5;
-const VIBES_MANUAL_MAX = 10;
 
 // ---------------------------------------------------------------
 // HELPERS
@@ -2171,6 +2161,10 @@ async function createAndPlaceTrack(name, vibe, ctx) {
       state.selected = null;
     } else {
       document.getElementById('sort-textarea').value = '';
+      document.getElementById('results-area').innerHTML =
+        '<div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>';
+      closeSuggestionsDrawer();
+      state.selected = null;
       if (state.selectedFrom === state.inbox) renderInboxTracks();
       else if (state.selectedFrom) openPlaylist(state.selectedFrom);
     }
@@ -2619,17 +2613,56 @@ async function unassignTrack(id) {
 }
 
 // ---------------------------------------------------------------
-// WELCOME MODAL
+// STARTUP MODAL
 // ---------------------------------------------------------------
-function completeSetup() {
-  localStorage.setItem('krate_ready', '1');
-  document.getElementById('welcome-modal').classList.remove('open');
-  checkXmlOnStartup();
+let _startupXmlFile   = null;
+let _startupVibesFile = null;
+
+function startupHandleXml(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _startupXmlFile = file;
+  document.getElementById('startup-xml-label').textContent = file.name;
+  document.getElementById('startup-xml-zone').classList.add('has-file');
+  const btn = document.getElementById('startup-btn');
+  btn.disabled      = false;
+  btn.style.opacity = '1';
+  btn.style.cursor  = 'pointer';
+  document.getElementById('startup-result').textContent = '';
 }
 
-function openWelcomeModal() {
-  localStorage.removeItem('krate_ready');
-  document.getElementById('welcome-modal').classList.add('open');
+function startupHandleVibes(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _startupVibesFile = file;
+  document.getElementById('startup-vibes-label').textContent = file.name;
+  document.getElementById('startup-vibes-zone').classList.add('has-file');
+}
+
+async function startupSubmit() {
+  if (!_startupXmlFile) return;
+  const btn    = document.getElementById('startup-btn');
+  const result = document.getElementById('startup-result');
+  btn.disabled       = true;
+  btn.textContent    = 'CARGANDO...';
+  result.style.color = '#6A6858';
+  result.textContent = '';
+  const fd = new FormData();
+  fd.append('xml', _startupXmlFile);
+  if (_startupVibesFile) fd.append('vibes', _startupVibesFile);
+  try {
+    const res  = await fetch('/api/startup', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Error al cargar');
+    document.getElementById('startup-modal').classList.remove('open');
+    await loadAll();
+  } catch(e) {
+    result.style.color = '#FF3D1A';
+    result.textContent = e.message;
+    btn.disabled       = false;
+    btn.textContent    = 'INICIAR SESIÓN';
+    btn.style.opacity  = '1';
+  }
 }
 
 // XML PICKER
@@ -2642,88 +2675,10 @@ async function openXmlModal() {
     const data = await res.json();
     document.getElementById('xml-current-name').textContent = data.filename || '—';
   } catch(e) {}
-  renderVibesHistory();
 }
 
 function closeXmlModal() {
   document.getElementById('xml-dialog').classList.remove('open');
-}
-
-function formatVibesTs(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString('es-ES', {
-    day: 'numeric', month: 'short',
-    hour: '2-digit', minute: '2-digit'
-  }).replace(',', ' ·');
-}
-
-async function snapshotVibes(storageKey, maxCount) {
-  try {
-    const res = await fetch('/api/vibes');
-    if (!res.ok) return;
-    const data = await res.json();
-    const list = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    list.unshift({ ts: new Date().toISOString(), data });
-    if (list.length > maxCount) list.length = maxCount;
-    localStorage.setItem(storageKey, JSON.stringify(list));
-  } catch(e) { console.warn('vibes snapshot failed', e); }
-}
-
-async function autoSaveVibes() {
-  await snapshotVibes(VIBES_AUTO_KEY, VIBES_AUTO_MAX);
-}
-
-async function manualSaveVibes() {
-  await snapshotVibes(VIBES_MANUAL_KEY, VIBES_MANUAL_MAX);
-  renderVibesHistory();
-  showToast('Guardado manual completado');
-}
-
-async function restoreVibes(dataObj) {
-  if (!dataObj) { showToast('Error: snapshot inválido'); return; }
-  try {
-    const blob = new Blob([JSON.stringify(dataObj, null, 2)], { type: 'application/json' });
-    const file = new File([blob], 'krate_vibes.json', { type: 'application/json' });
-    const fd   = new FormData();
-    fd.append('file', file);
-    const res  = await fetch('/api/vibes/import', { method: 'POST', body: fd });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Error al restaurar');
-    showToast('Vibes restauradas');
-    loadPlaylists();
-  } catch(e) { showToast('Error: ' + e.message); }
-}
-
-function vibesSnapData(storageKey, index) {
-  const list = JSON.parse(localStorage.getItem(storageKey) || '[]');
-  return list[index] ? list[index].data : null;
-}
-
-function renderVibesHistory() {
-  function buildList(storageKey, containerId) {
-    const list = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const el   = document.getElementById(containerId);
-    if (!el) return;
-    if (list.length === 0) {
-      el.innerHTML = '<div class="vibes-empty">Sin guardados aún.</div>';
-      return;
-    }
-    el.innerHTML = list.map((snap, i) => `
-      <div class="vibes-snap-row">
-        <span class="vibes-snap-ts">${formatVibesTs(snap.ts)}</span>
-        <button class="vibes-snap-restore" onclick="restoreVibes(vibesSnapData('${storageKey}',${i}))">Restaurar</button>
-      </div>
-    `).join('');
-  }
-  buildList(VIBES_AUTO_KEY,   'vibes-history-auto');
-  buildList(VIBES_MANUAL_KEY, 'vibes-history-manual');
-}
-
-function switchVibesTab(tab) {
-  document.getElementById('vibes-tab-auto').classList.toggle('active',   tab === 'auto');
-  document.getElementById('vibes-tab-manual').classList.toggle('active', tab === 'manual');
-  document.getElementById('vibes-history-auto').style.display   = tab === 'auto'   ? 'flex' : 'none';
-  document.getElementById('vibes-history-manual').style.display = tab === 'manual' ? 'flex' : 'none';
 }
 
 function exportVibes() {
@@ -2801,16 +2756,6 @@ document.getElementById('xml-dialog').addEventListener('click', e => {
   if (e.target === document.getElementById('xml-dialog')) closeXmlModal();
 });
 
-async function checkXmlOnStartup() {
-  try {
-    const res  = await fetch('/api/xml-info');
-    const data = await res.json();
-    if (!data.exists) openXmlModal();
-  } catch(e) {
-    openXmlModal();
-  }
-}
-
 async function checkAudioServer() {
   try {
     await fetch(AUDIO_BASE + '/ping', { signal: AbortSignal.timeout(2000) });
@@ -2824,14 +2769,12 @@ async function checkAudioServer() {
 // INIT
 // ---------------------------------------------------------------
 applyInboxGridStyle();
-loadAll();
 checkAudioServer();
-setInterval(autoSaveVibes, 3 * 60 * 1000);
-if (!localStorage.getItem('krate_ready')) {
-  document.getElementById('welcome-modal').classList.add('open');
-} else {
-  checkXmlOnStartup();
-}
+localStorage.removeItem('krate_ready');
+localStorage.removeItem('krate_vibes_auto');
+localStorage.removeItem('krate_vibes_manual');
+// loadAll() is called by startupSubmit() after files are uploaded.
+// startup-modal is already open via class="dialog-overlay open" in HTML.
 </script>
 </body>
 </html>
