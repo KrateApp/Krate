@@ -78,6 +78,8 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .result-card.done{animation:krate-card-out 250ms cubic-bezier(0.4,0,1,1) forwards;pointer-events:none}
 .result-card--create{border-style:dashed;border-color:#2A2A22}
 .result-card--create:hover{border-color:#6A6858}
+.result-card--create-primary{border-style:solid;border-color:#2A2A22}
+.result-card--create-primary:hover{border-color:#FF3D1A}
 .result-rank{font-size:9px;color:#333;letter-spacing:1px;min-width:20px;padding-top:2px;flex-shrink:0}
 .result-rank.best{color:#FF3D1A}
 .result-name{font-size:13px;color:#C8C4B8;font-weight:500;margin-bottom:3px}
@@ -1492,15 +1494,17 @@ function renderResults(data) {
     const np       = data.new_playlist;
     const safeName = esc(np.name).replace(/'/g, "\\'");
     const safeVibe = esc(np.vibe).replace(/'/g, "\\'");
+    const isCreate = data.intent === 'create';
     html +=
-      '<div class="result-card result-card--create" id="res-new">'
-      + '<div class="result-rank" style="color:#6A6858">+</div>'
+      '<div class="result-card result-card--create' + (isCreate ? ' result-card--create-primary' : '') + '" id="res-new">'
+      + '<div class="result-rank" style="color:' + (isCreate ? '#FF3D1A' : '#6A6858') + '">' + (isCreate ? '✦' : '+') + '</div>'
       + '<div style="flex:1;min-width:0">'
-      + '<div class="result-name" style="color:#9A9880">Crear: ' + esc(np.name) + '</div>'
+      + '<div class="result-name" style="color:' + (isCreate ? '#C8C4B8' : '#9A9880') + '">' + (isCreate ? '' : 'Crear: ') + esc(np.name) + '</div>'
       + '<div class="result-why">' + esc(np.vibe) + '</div>'
       + '</div>'
       + '<div class="result-actions">'
       + '<div class="ra-btn place" onclick="createAndPlaceTrack(\'' + safeName + '\',\'' + safeVibe + '\',\'inbox\')">Crear y colocar</div>'
+      + '<div class="ra-btn skip" onclick="createOnlyPlaylist(\'' + safeName + '\',\'' + safeVibe + '\')">Solo crear</div>'
       + '</div></div>';
   }
 
@@ -2061,15 +2065,17 @@ function renderDialogResults(data) {
     const np       = data.new_playlist;
     const safeName = esc(np.name).replace(/'/g, "\\'");
     const safeVibe = esc(np.vibe).replace(/'/g, "\\'");
+    const isCreate = data.intent === 'create';
     html +=
-      '<div class="result-card result-card--create" id="dres-new">'
-      + '<div class="result-rank" style="color:#6A6858">+</div>'
+      '<div class="result-card result-card--create' + (isCreate ? ' result-card--create-primary' : '') + '" id="dres-new">'
+      + '<div class="result-rank" style="color:' + (isCreate ? '#FF3D1A' : '#6A6858') + '">' + (isCreate ? '✦' : '+') + '</div>'
       + '<div style="flex:1;min-width:0">'
-      + '<div class="result-name" style="color:#9A9880">Crear: ' + esc(np.name) + '</div>'
+      + '<div class="result-name" style="color:' + (isCreate ? '#C8C4B8' : '#9A9880') + '">' + (isCreate ? '' : 'Crear: ') + esc(np.name) + '</div>'
       + '<div class="result-why">' + esc(np.vibe) + '</div>'
       + '</div>'
       + '<div class="result-actions">'
       + '<div class="ra-btn place" onclick="createAndPlaceTrack(\'' + safeName + '\',\'' + safeVibe + '\',\'dialog\')">Crear y colocar</div>'
+      + '<div class="ra-btn skip" onclick="createOnlyPlaylist(\'' + safeName + '\',\'' + safeVibe + '\')">Solo crear</div>'
       + '</div></div>';
   }
 
@@ -2121,6 +2127,26 @@ async function placeFromDialog(idx, playlist) {
     }
   } catch(e) {
     showToast('Error al colocar la pista');
+  }
+}
+
+async function createOnlyPlaylist(name, vibe) {
+  try {
+    const cr = await fetch('/api/playlists/create', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({name, vibe})
+    });
+    const crData = await cr.json();
+    if (crData.error) throw new Error(crData.error);
+    await loadPlaylists();
+    showToast('Playlist creada: ' + name);
+    document.getElementById('sort-textarea').value = '';
+    document.getElementById('results-area').innerHTML =
+      '<div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>';
+    closeSuggestionsDrawer();
+  } catch(e) {
+    showToast('Error: ' + e.message);
   }
 }
 

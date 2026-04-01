@@ -135,6 +135,38 @@ Omit "new_playlist" entirely if existing playlists cover this track well."""
     return json.loads(raw)
 
 
+def create_vibe(description: str) -> dict:
+    """
+    Dado el request explícito del usuario para crear una playlist,
+    extrae un nombre corto y una descripción de vibe en una oración.
+    Returns: {"name": "...", "vibe": "..."}
+    """
+    prompt = f"""You are Krate, a DJ playlist assistant.
+The user wants to CREATE a new playlist. Their request may be in any language.
+Extract or invent a short, punchy playlist name and a one-sentence vibe description.
+The vibe should describe the energy, mood, and context a DJ would use this playlist for.
+Write the vibe in the same language the user wrote in.
+
+USER REQUEST:
+{description}
+
+Respond with JSON only — no markdown, no explanation:
+{{"name": "Short Playlist Name", "vibe": "one-sentence vibe for a DJ"}}"""
+
+    message = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=200,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = message.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    return json.loads(raw)
+
+
 # ---------------------------------------------------------------
 # SETUP MODE  — write vibe descriptions for your playlists
 # ---------------------------------------------------------------

@@ -154,6 +154,18 @@ def set_vibe(playlist):
     return jsonify({"ok": True})
 
 
+_CREATE_PATTERNS = re.compile(
+    r'\b(crea(r|me)?|nueva?\s+(playlist|lista)|new\s+playlist|make\s+(a\s+)?playlist'
+    r'|quiero\s+una\s+(lista|playlist)|lista\s+nueva|playlist\s+nueva'
+    r'|nueva\s+lista|a\s+new\s+list|create\s+(a\s+)?(playlist|list)'
+    r'|hazme\s+una|ponme\s+una|pon\s+una)\b',
+    re.IGNORECASE
+)
+
+def _is_create_intent(text: str) -> bool:
+    return bool(_CREATE_PATTERNS.search(text))
+
+
 def _display_name(raw_name, names_map):
     """Return a clean display name for a playlist, suitable for the AI prompt."""
     name = names_map.get(raw_name) or raw_name
@@ -165,7 +177,7 @@ def _display_name(raw_name, names_map):
 @app.route("/api/match", methods=["POST"])
 def do_match():
     # Lazy import so Anthropic client is only created on first match call
-    from krate import match_vibe
+    from krate import match_vibe, create_vibe
 
     data        = request.get_json()
     description = (data.get("description") or "").strip()
@@ -173,6 +185,18 @@ def do_match():
 
     if not description:
         return jsonify({"error": "No description provided"}), 400
+
+    # Explicit create-playlist intent detection
+    if _is_create_intent(description):
+        try:
+            np = create_vibe(description)
+            return jsonify({
+                "intent":       "create",
+                "new_playlist": {"name": np["name"], "vibe": np["vibe"]},
+                "suggestions":  [],
+            })
+        except Exception:
+            pass  # fall through to normal matching
 
     vibes     = load_vibes()
     names_map = vibes.get("_names", {})
