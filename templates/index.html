@@ -217,9 +217,6 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .voice-mic-btn{background:transparent;border:1px solid #1A1914;border-radius:3px;color:#3A3830;cursor:pointer;padding:3px 10px;font-size:11px;letter-spacing:0.5px;transition:all .1s;flex-shrink:0}
 .voice-mic-btn:hover{border-color:#333;color:#6A6858}
 .voice-mic-btn.listening{border-color:#FF3D1A;color:#FF3D1A;animation:voice-pulse 1s ease-in-out infinite}
-.voice-lang-btn{background:transparent;border:1px solid #1A1914;border-radius:3px;color:#2A2A22;cursor:pointer;padding:2px 7px;font-size:9px;letter-spacing:1px;transition:all .1s}
-.voice-lang-btn:hover{border-color:#333;color:#6A6858}
-.voice-lang-btn.active{border-color:#FF3D1A;color:#FF3D1A}
 @keyframes voice-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
 /* track row actions (expanded when selected) */
@@ -525,8 +522,6 @@ body{font-family:var(--font-sans,system-ui);margin:0}
           <div class="sort-actions">
             <div class="voice-controls" id="sort-voice-controls">
               <button class="voice-mic-btn" id="sort-voice-btn" onclick="toggleVoice('sort')">⏺ Hablar</button>
-              <button class="voice-lang-btn active" data-lang="es-US" onclick="setVoiceLang('es-US','sort')">ES</button>
-              <button class="voice-lang-btn" data-lang="en-US" onclick="setVoiceLang('en-US','sort')">EN</button>
             </div>
             <button class="btn-primary" id="match-btn" onclick="doMatch()">Coincidir</button>
             <div class="sort-hint" id="sort-hint">Modo revisión · — playlists activas</div>
@@ -627,8 +622,6 @@ body{font-family:var(--font-sans,system-ui);margin:0}
       <div class="sort-actions">
         <div class="voice-controls" id="dialog-voice-controls">
           <button class="voice-mic-btn" id="dialog-voice-btn" onclick="toggleVoice('dialog')">⏺ Hablar</button>
-          <button class="voice-lang-btn active" data-lang="es-US" onclick="setVoiceLang('es-US','dialog')">ES</button>
-          <button class="voice-lang-btn" data-lang="en-US" onclick="setVoiceLang('en-US','dialog')">EN</button>
         </div>
         <button class="btn-primary" id="dialog-match-btn" onclick="doDialogMatch()">Coincidir</button>
         <div class="sort-hint" id="dialog-hint"></div>
@@ -2577,13 +2570,6 @@ function stopVoice(ctx) {
   if (btn) { btn.disabled = false; btn.classList.remove('listening'); btn.textContent = '⏺ Hablar'; }
 }
 
-function setVoiceLang(lang, ctx) {
-  voiceState[ctx].lang = lang;
-  const ctrlId = ctx === 'dialog' ? 'dialog-voice-controls' : 'sort-voice-controls';
-  document.getElementById(ctrlId).querySelectorAll('.voice-lang-btn')
-    .forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
-  if (voiceState[ctx].listening) { stopVoice(ctx); startVoice(ctx); }
-}
 
 // ---------------------------------------------------------------
 // REJECT FROM INBOX
