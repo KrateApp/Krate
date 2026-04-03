@@ -1581,14 +1581,14 @@ function skipResult(idx) {
   if (card) card.remove();
 }
 
-// Ctrl/Cmd+Enter to match
+// Enter to match, Shift+Enter for new line
 document.getElementById('sort-textarea').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doMatch();
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doMatch(); }
 });
 
-// Ctrl/Cmd+Enter in dialog, Escape to close
+// Enter to match in dialog, Shift+Enter for new line, Escape to close
 document.getElementById('dialog-textarea').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doDialogMatch();
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doDialogMatch(); }
   if (e.key === 'Escape') closeActionDialog();
 });
 document.getElementById('action-dialog').addEventListener('click', e => {
@@ -2717,8 +2717,32 @@ function closeXmlModal() {
   document.getElementById('xml-dialog').classList.remove('open');
 }
 
-function exportVibes() {
-  window.location.href = '/api/vibes/export';
+async function exportVibes() {
+  let fileHandle = null;
+  if (window.showSaveFilePicker) {
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: 'playlist_vibes.json',
+        types: [{ description: 'JSON', accept: {'application/json': ['.json']} }],
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      throw err;
+    }
+  }
+  const res = await fetch('/api/vibes/export');
+  const blob = await res.blob();
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    showToast('Vibes guardadas: ' + fileHandle.name);
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'playlist_vibes.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 async function importVibes(input) {
