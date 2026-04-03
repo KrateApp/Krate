@@ -2627,6 +2627,7 @@ async function rejectInboxTrack(id) {
   const chip = document.getElementById('selected-chip');
   if (chip) chip.classList.remove('visible');
 
+  closeActionDialog();
   renderSessionPanel();
   renderInboxTracks();
   showToast('✕ no deseados');
