@@ -118,7 +118,7 @@ Respond with JSON only — no markdown, no explanation outside the JSON:
 Omit "new_playlist" entirely if existing playlists cover this track well."""
 
     message = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=900,
         messages=[{"role": "user", "content": prompt}]
     )
@@ -154,7 +154,7 @@ Respond with JSON only — no markdown, no explanation:
 {{"name": "Short Playlist Name", "vibe": "one-sentence vibe for a DJ"}}"""
 
     message = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=200,
         messages=[{"role": "user", "content": prompt}]
     )
