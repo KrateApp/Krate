@@ -218,7 +218,9 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .voice-mic-btn:hover{border-color:#333;color:#6A6858}
 .voice-mic-btn.listening{border-color:#FF3D1A;color:#FF3D1A;animation:voice-pulse 1s ease-in-out infinite}
 @keyframes voice-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.voice-lang-btn{display:none}
+.voice-lang-btn{background:transparent;border:1px solid #1A1914;border-radius:3px;color:#2A2A22;cursor:pointer;padding:2px 7px;font-size:9px;letter-spacing:1px;transition:all .1s}
+.voice-lang-btn:hover{border-color:#333;color:#6A6858}
+.voice-lang-btn.active{border-color:#FF3D1A;color:#FF3D1A}
 
 /* track row actions (expanded when selected) */
 .track-row-actions{grid-column:1/-1;display:flex;gap:6px;padding:8px 0 2px}
