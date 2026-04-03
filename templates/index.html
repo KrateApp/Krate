@@ -2484,34 +2484,6 @@ document.getElementById('waveform-canvas').addEventListener('click', e => {
 });
 
 // ---------------------------------------------------------------
-// VOICE VOCAB CORRECTION
-// ---------------------------------------------------------------
-let _voiceVocab = null;
-async function loadVoiceVocab() {
-  if (_voiceVocab) return _voiceVocab;
-  try {
-    const r = await fetch('/static/voice_vocab.json');
-    const data = await r.json();
-    _voiceVocab = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (k !== '_meta') _voiceVocab[k.toLowerCase()] = v;
-    }
-  } catch(e) { _voiceVocab = {}; }
-  return _voiceVocab;
-}
-function applyVoiceVocab(text, vocab) {
-  if (!vocab || !text) return text;
-  // Sort by length desc so longer phrases match before shorter ones
-  const keys = Object.keys(vocab).sort((a, b) => b.length - a.length);
-  let result = text;
-  for (const key of keys) {
-    const re = new RegExp('(?<![\\w])' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w])', 'gi');
-    result = result.replace(re, vocab[key]);
-  }
-  return result;
-}
-
-// ---------------------------------------------------------------
 // VOICE RECOGNITION
 // ---------------------------------------------------------------
 const voiceState = {
@@ -2570,15 +2542,8 @@ function startVoice(ctx) {
         ? (final   += e.results[i][0].transcript)
         : (interim += e.results[i][0].transcript);
     }
-    if (final) {
-      loadVoiceVocab().then(vocab => {
-        const corrected = applyVoiceVocab(final, vocab);
-        document.getElementById(textareaId).value = baseText + corrected + interim;
-        baseText += corrected;
-      });
-    } else {
-      document.getElementById(textareaId).value = baseText + interim;
-    }
+    document.getElementById(textareaId).value = baseText + final + interim;
+    if (final) baseText += final;
   };
 
   rec.onerror = (e) => {
