@@ -294,7 +294,7 @@ def rename_playlist():
             if vibes.get("_inbox") == original:
                 vibes["_inbox"] = new_name
             names.pop(new_name, None)   # no need to store display name for new key
-            names.pop(original, None)
+            # Keep names[original] so export_xml() can rename the XML node from original → display_name
     else:
         names.pop(original, None)   # empty = revert to raw name
     vibes["_names"] = names
