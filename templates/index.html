@@ -563,7 +563,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
         <div class="sort-label" style="margin-top:4px">PLAYLISTS MODIFICADAS</div>
         <div class="session-modified-list" id="session-modified-list"></div>
       </div>
-      <div class="session-actions" id="session-actions" style="display:none">
+      <div class="session-actions" id="session-actions">
         <button class="btn-primary" onclick="exportXML()">Exportar a Rekordbox</button>
         <div style="margin-top:10px;padding:10px 12px;background:#0E0D0B;border:1px solid #1A1914;border-radius:3px;font-size:11px;color:#6A6858;line-height:1.6">
           Antes de cerrar, guarda tus descripciones de vibe — se pierden si el servidor reinicia.<br>
@@ -1332,7 +1332,7 @@ function renderSessionPanel() {
     badge.textContent  = entries.length || '';
     badge.style.display = entries.length ? '' : 'none';
   }
-  if (actions) actions.style.display = entries.length ? 'flex' : 'none';
+  if (actions) actions.style.display = 'flex';
 
   const html = entries.length
     ? entries.map(([, a]) =>
