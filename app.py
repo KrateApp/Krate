@@ -18,22 +18,21 @@ session_modified_playlists = set()
 
 
 # ---------------------------------------------------------------
-# DATA HELPERS  (mirrors krate.py, no Anthropic import at startup)
+# ID-BASED VIBES  —  internal format
+#
+# playlist_vibes.json schema (new):
+#   "_id_map":   { "42": "Dark Room", ... }   ← id→current_name (from XML)
+#   "42":        "vibe text"                  ← vibe keyed by playlist ID
+#   "_names":    { "42": "My Custom Name" }   ← user display-name overrides
+#   "_inbox":    "42"                         ← playlist ID
+#   "_ignored":  ["7", "12"]                  ← list of playlist IDs
+#   "_order":    ["42", "7", "12"]            ← list of playlist IDs
+#   "_virtual":  ["v_1"]                      ← virtual playlist IDs (user-created)
+#   "_deleted":  ["5"]                        ← deleted playlist IDs
+#   "_xml_path": "/path/to/file.xml"          ← stored path
+#
+# Virtual playlists (AI-suggested, not yet in XML) use string IDs like "v_1".
 # ---------------------------------------------------------------
-
-def load_library():
-    tree = ET.parse(get_xml_path())
-    root = tree.getroot()
-    tracks = {}
-    for track in root.find("COLLECTION"):
-        tid = track.get("TrackID")
-        tracks[tid] = {"name": track.get("Name"), "artist": track.get("Artist")}
-    playlists = {}
-    for node in root.find("PLAYLISTS")[0]:
-        name = node.get("Name")
-        if name:
-            playlists[name] = [e.get("Key") for e in node]
-    return tracks, playlists
 
 
 def load_vibes():
@@ -61,6 +60,207 @@ def get_xml_path():
 
 
 # ---------------------------------------------------------------
+# XML PLAYLIST PARSING
+# ---------------------------------------------------------------
+
+def parse_xml_playlists(xml_root):
+    """
+    Returns:
+        id_to_name:  { playlist_id: name }
+        name_to_id:  { name: playlist_id }
+        id_to_tracks: { playlist_id: [track_id, ...] }
+    """
+    id_to_name   = {}
+    name_to_id   = {}
+    id_to_tracks = {}
+    playlists_root = xml_root.find("PLAYLISTS")
+    if playlists_root is None or len(playlists_root) == 0:
+        return id_to_name, name_to_id, id_to_tracks
+    for node in playlists_root[0]:
+        pl_id   = node.get("Id")
+        pl_name = node.get("Name")
+        if not pl_id or not pl_name:
+            continue
+        id_to_name[pl_id]   = pl_name
+        name_to_id[pl_name] = pl_id
+        id_to_tracks[pl_id] = [e.get("Key") for e in node.findall("TRACK")]
+    return id_to_name, name_to_id, id_to_tracks
+
+
+# ---------------------------------------------------------------
+# MIGRATION  —  name-keyed JSON → ID-keyed JSON
+# ---------------------------------------------------------------
+
+def _is_old_format(vibes):
+    """Return True if the JSON uses playlist names as keys (old format)."""
+    return "_id_map" not in vibes
+
+
+def migrate_vibes_to_id_keys(vibes, xml_root):
+    """
+    Convert a name-keyed vibes dict to ID-keyed in-place (returns new dict).
+    Uses the XML to build the name→ID mapping.
+    Any playlist name that doesn't appear in the XML is dropped silently.
+    """
+    id_to_name, name_to_id, _ = parse_xml_playlists(xml_root)
+
+    new_vibes = {"_id_map": id_to_name}
+
+    # Preserve xml_path
+    if "_xml_path" in vibes:
+        new_vibes["_xml_path"] = vibes["_xml_path"]
+
+    # Migrate vibe texts  (skip meta keys)
+    meta_keys = {"_ignored", "_order", "_inbox", "_virtual", "_deleted",
+                 "_names", "_xml_path"}
+    for key, val in vibes.items():
+        if key in meta_keys:
+            continue
+        if key.startswith("_"):
+            continue
+        pl_id = name_to_id.get(key)
+        if pl_id and isinstance(val, str):
+            new_vibes[pl_id] = val
+
+    # Migrate _ignored  (names → IDs)
+    old_ignored = vibes.get("_ignored", [])
+    new_vibes["_ignored"] = [
+        name_to_id[n] for n in old_ignored if n in name_to_id
+    ]
+
+    # Migrate _order  (names → IDs)
+    old_order = vibes.get("_order", [])
+    migrated_order = [name_to_id[n] for n in old_order if n in name_to_id]
+    # Append any IDs not in the migrated order
+    in_order = set(migrated_order)
+    for pl_id in id_to_name:
+        if pl_id not in in_order:
+            migrated_order.append(pl_id)
+    new_vibes["_order"] = migrated_order
+
+    # Migrate _inbox
+    old_inbox = vibes.get("_inbox")
+    if old_inbox and old_inbox in name_to_id:
+        new_vibes["_inbox"] = name_to_id[old_inbox]
+
+    # Migrate _virtual  (names, keep as-is since they're user-generated IDs)
+    new_vibes["_virtual"] = vibes.get("_virtual", [])
+
+    # Migrate _deleted  (names → IDs; drop unknown)
+    old_deleted = vibes.get("_deleted", [])
+    new_vibes["_deleted"] = [
+        name_to_id[n] for n in old_deleted if n in name_to_id
+    ]
+
+    # Migrate _names  ({ name: display } → { id: display })
+    old_names = vibes.get("_names", {})
+    new_names = {}
+    for n, display in old_names.items():
+        pl_id = name_to_id.get(n)
+        if pl_id:
+            new_names[pl_id] = display
+    new_vibes["_names"] = new_names
+
+    return new_vibes
+
+
+def refresh_id_map(vibes, xml_root):
+    """
+    After loading an XML, update _id_map with current names from the XML.
+    This handles renames: the ID stays the same but the name may have changed.
+    """
+    id_to_name, _, _ = parse_xml_playlists(xml_root)
+    vibes["_id_map"] = id_to_name
+    return vibes
+
+
+# ---------------------------------------------------------------
+# NAME ↔ ID RESOLUTION HELPERS
+# (used by all routes to translate between API (name) and storage (ID))
+# ---------------------------------------------------------------
+
+def _get_id_map(vibes):
+    """Return { pl_id: name } from vibes."""
+    return vibes.get("_id_map", {})
+
+
+def _name_to_id(vibes, name):
+    """Resolve a playlist name to its ID. Returns None if not found."""
+    id_map = _get_id_map(vibes)
+    for pl_id, pl_name in id_map.items():
+        if pl_name == name:
+            return pl_id
+    # Check virtual playlists — match by display name stored in _names
+    names = vibes.get("_names", {})
+    for v_id in vibes.get("_virtual", []):
+        if names.get(v_id) == name or v_id == name:
+            return v_id
+    return None
+
+
+def _id_to_name(vibes, pl_id):
+    """Resolve an ID back to the current Rekordbox name (or display name for virtuals)."""
+    id_map = _get_id_map(vibes)
+    if pl_id in id_map:
+        return id_map[pl_id]
+    # Virtual playlists: return their display name
+    if pl_id in vibes.get("_virtual", []):
+        return vibes.get("_names", {}).get(pl_id) or pl_id
+    return pl_id   # fallback: return ID as-is
+
+
+# ---------------------------------------------------------------
+# DATA HELPERS
+# ---------------------------------------------------------------
+
+def load_library():
+    """
+    Returns:
+        tracks:    { track_id: {name, artist} }
+        playlists: { name: [track_id, ...] }   ← keyed by name for backwards compat
+    """
+    tree = ET.parse(get_xml_path())
+    root = tree.getroot()
+    tracks = {}
+    for track in root.find("COLLECTION"):
+        tid = track.get("TrackID")
+        tracks[tid] = {"name": track.get("Name"), "artist": track.get("Artist")}
+    _, _, id_to_tracks = parse_xml_playlists(root)
+    vibes = load_vibes()
+    id_map = _get_id_map(vibes)
+    playlists = {}
+    for pl_id, track_ids in id_to_tracks.items():
+        name = id_map.get(pl_id, pl_id)
+        playlists[name] = track_ids
+    return tracks, playlists
+
+
+def _load_xml_root():
+    tree = ET.parse(get_xml_path())
+    return tree.getroot()
+
+
+def _ensure_migrated(vibes, xml_root):
+    """If vibes are in old name-keyed format, migrate and save them."""
+    if _is_old_format(vibes):
+        vibes = migrate_vibes_to_id_keys(vibes, xml_root)
+        save_vibes(vibes)
+    return vibes
+
+
+def _load_and_migrate():
+    """Load vibes, migrating to ID-keyed format if necessary. Returns vibes."""
+    vibes = load_vibes()
+    if _is_old_format(vibes):
+        try:
+            xml_root = _load_xml_root()
+            vibes = _ensure_migrated(vibes, xml_root)
+        except Exception:
+            pass  # No XML yet — leave as-is until XML is uploaded
+    return vibes
+
+
+# ---------------------------------------------------------------
 # ROUTES
 # ---------------------------------------------------------------
 
@@ -78,14 +278,19 @@ def stats():
     except Exception:
         track_count = playlist_count = 0
 
-    vibes   = load_vibes()
+    vibes   = _load_and_migrate()
     ignored = vibes.get("_ignored", [])
+    inbox_id = vibes.get("_inbox")
+
     vibes_count = sum(
         1 for k, v in vibes.items()
-        if k != "_ignored" and not k.startswith("_")
+        if not k.startswith("_")
         and isinstance(v, str) and v.strip() and v != "SKIP"
+        and k not in ignored
     )
     active_count = max(0, playlist_count - len(ignored))
+
+    inbox_name = _id_to_name(vibes, inbox_id) if inbox_id else None
 
     return jsonify({
         "tracks":      track_count,
@@ -93,63 +298,82 @@ def stats():
         "hidden":      len(ignored),
         "vibes_set":   vibes_count,
         "vibes_total": active_count,
-        "inbox_name":  vibes.get("_inbox"),
+        "inbox_name":  inbox_name,
     })
 
 
 @app.route("/api/playlists")
 def get_playlists():
     try:
-        _, playlists_data = load_library()
+        xml_root = _load_xml_root()
+        id_to_name, _, id_to_tracks = parse_xml_playlists(xml_root)
     except Exception:
-        playlists_data = {}
+        id_to_name   = {}
+        id_to_tracks = {}
 
-    vibes   = load_vibes()
+    vibes   = _load_and_migrate()
     ignored = vibes.get("_ignored", [])
     deleted = vibes.get("_deleted", [])
     order   = vibes.get("_order", [])
     virtual = vibes.get("_virtual", [])
     names   = vibes.get("_names", {})
 
-    result = []
-    xml_names = set()
-    for name, track_ids in playlists_data.items():
-        if name in deleted:
+    result  = []
+    seen_ids = set()
+
+    for pl_id, pl_name in id_to_name.items():
+        if pl_id in deleted:
             continue
-        xml_names.add(name)
+        seen_ids.add(pl_id)
+        custom_name = names.get(pl_id, "")
         result.append({
-            "name":        name,
-            "count":       len(track_ids),
-            "vibe":        vibes.get(name, ""),
-            "hidden":      name in ignored,
+            "name":        pl_name,
+            "count":       len(id_to_tracks.get(pl_id, [])),
+            "vibe":        vibes.get(pl_id, ""),
+            "hidden":      pl_id in ignored,
             "virtual":     False,
-            "custom_name": names.get(name, ""),
+            "custom_name": custom_name,
         })
 
-    for name in virtual:
-        if name in deleted or name in xml_names:
+    for v_id in virtual:
+        if v_id in deleted or v_id in seen_ids:
             continue
+        # Virtual playlists: use the stored display name as the external name
+        v_name = names.get(v_id) or v_id
         result.append({
-            "name":        name,
+            "name":        v_name,
             "count":       0,
-            "vibe":        vibes.get(name, ""),
-            "hidden":      name in ignored,
+            "vibe":        vibes.get(v_id, ""),
+            "hidden":      v_id in ignored,
             "virtual":     True,
-            "custom_name": names.get(name, ""),
+            "custom_name": "",   # already the display name
         })
 
     if order:
-        order_map = {name: i for i, name in enumerate(order)}
-        result.sort(key=lambda p: order_map.get(p["name"], len(order)))
+        # Build a name-based order for the result list
+        def _order_key(p):
+            pl_id = _name_to_id(vibes, p["name"])
+            if pl_id is None:
+                pl_id = p["name"]
+            try:
+                return order.index(pl_id)
+            except ValueError:
+                return len(order)
+        result.sort(key=_order_key)
 
     return jsonify(result)
 
 
 @app.route("/api/vibes/<path:playlist>", methods=["POST"])
 def set_vibe(playlist):
+    """playlist param is a playlist NAME (from the frontend)."""
     data  = request.get_json()
-    vibes = load_vibes()
-    vibes[playlist] = data.get("vibe", "")
+    vibes = _load_and_migrate()
+    pl_id = _name_to_id(vibes, playlist)
+    if pl_id is None:
+        # Unknown playlist — store by name as fallback (shouldn't happen)
+        pl_id = playlist
+    vibes[pl_id] = data.get("vibe", "")
     save_vibes(vibes)
     return jsonify({"ok": True})
 
@@ -166,17 +390,20 @@ def _is_create_intent(text: str) -> bool:
     return bool(_CREATE_PATTERNS.search(text))
 
 
-def _display_name(raw_name, names_map):
-    """Return a clean display name for a playlist, suitable for the AI prompt."""
-    name = names_map.get(raw_name) or raw_name
-    name = re.sub(r'^MASMASMAS\s*[-\u2013]\s*', '', name, flags=re.IGNORECASE)
-    name = re.sub(r'\s*\(\d+\)\s*$', '', name)
-    return name.strip()
+def _display_name(pl_id, vibes):
+    """
+    Return a clean display name for a playlist ID, suitable for the AI prompt.
+    Strips the MASMASMAS prefix and trailing (N) counters.
+    """
+    custom = vibes.get("_names", {}).get(pl_id)
+    raw = custom or _id_to_name(vibes, pl_id)
+    raw = re.sub(r'^MASMASMAS\s*[-\u2013]\s*', '', raw, flags=re.IGNORECASE)
+    raw = re.sub(r'\s*\(\d+\)\s*$', '', raw)
+    return raw.strip()
 
 
 @app.route("/api/match", methods=["POST"])
 def do_match():
-    # Lazy import so Anthropic client is only created on first match call
     from krate import match_vibe, create_vibe
 
     data        = request.get_json()
@@ -186,7 +413,6 @@ def do_match():
     if not description:
         return jsonify({"error": "No description provided"}), 400
 
-    # Explicit create-playlist intent detection
     if _is_create_intent(description):
         try:
             np = create_vibe(description)
@@ -196,30 +422,41 @@ def do_match():
                 "suggestions":  [],
             })
         except Exception:
-            pass  # fall through to normal matching
+            pass
 
-    vibes     = load_vibes()
-    names_map = vibes.get("_names", {})
-    ignored   = vibes.get("_ignored", [])
+    vibes   = _load_and_migrate()
+    ignored = vibes.get("_ignored", [])
 
-    # Build active_vibes with clean display names for the AI prompt
+    # Build active_vibes: { display_name: vibe }
+    # Keys are display names (for the AI); values are vibe texts.
     active_vibes = {}
     for k, v in vibes.items():
         if k.startswith("_") or not isinstance(v, str) or not v.strip() or v == "SKIP":
             continue
-        if k in ignored:
+        # k is a playlist ID (or virtual ID)
+        pl_id = k
+        if pl_id in ignored:
             continue
-        active_vibes[_display_name(k, names_map)] = v
+        display = _display_name(pl_id, vibes)
+        active_vibes[display] = v
 
-    # Reverse map: display_name → internal_name (for resolving Claude's response)
-    reverse_map = {_display_name(k, names_map): k for k in vibes if not k.startswith("_")}
+    # Reverse map: display_name → playlist NAME (for the frontend)
+    reverse_map = {}
+    id_map = _get_id_map(vibes)
+    for pl_id in id_map:
+        if pl_id.startswith("_"):
+            continue
+        display = _display_name(pl_id, vibes)
+        reverse_map[display] = id_map[pl_id]
+    for v_id in vibes.get("_virtual", []):
+        display = _display_name(v_id, vibes)
+        reverse_map[display] = v_id
 
     if not active_vibes:
         return jsonify({"error": "No vibes set up yet"}), 400
 
     try:
         result = match_vibe(description, active_vibes, mode=mode)
-        # Resolve display names back to internal names
         if mode == "auto":
             pl = result.get("playlist", "")
             result["playlist"] = reverse_map.get(pl, pl)
@@ -239,20 +476,28 @@ def do_match():
 
 @app.route("/api/playlists/reorder", methods=["POST"])
 def reorder_playlists():
-    order = request.get_json().get("order", [])
-    vibes = load_vibes()
-    vibes["_order"] = order
+    """Receives a list of playlist NAMES, converts to IDs, saves."""
+    names_order = request.get_json().get("order", [])
+    vibes = _load_and_migrate()
+    id_order = []
+    for name in names_order:
+        pl_id = _name_to_id(vibes, name)
+        id_order.append(pl_id if pl_id else name)
+    vibes["_order"] = id_order
     save_vibes(vibes)
     return jsonify({"ok": True})
 
 
 @app.route("/api/playlists/hide", methods=["POST"])
 def hide_playlist():
-    name    = request.get_json().get("name")
-    vibes   = load_vibes()
+    name  = request.get_json().get("name")
+    vibes = _load_and_migrate()
+    pl_id = _name_to_id(vibes, name)
+    if not pl_id:
+        return jsonify({"ok": True})   # unknown playlist
     ignored = vibes.get("_ignored", [])
-    if name and name not in ignored:
-        ignored.append(name)
+    if pl_id not in ignored:
+        ignored.append(pl_id)
     vibes["_ignored"] = ignored
     save_vibes(vibes)
     return jsonify({"ok": True})
@@ -260,11 +505,14 @@ def hide_playlist():
 
 @app.route("/api/playlists/restore", methods=["POST"])
 def restore_playlist():
-    name    = request.get_json().get("name")
-    vibes   = load_vibes()
+    name  = request.get_json().get("name")
+    vibes = _load_and_migrate()
+    pl_id = _name_to_id(vibes, name)
+    if not pl_id:
+        return jsonify({"ok": True})
     ignored = vibes.get("_ignored", [])
-    if name in ignored:
-        ignored.remove(name)
+    if pl_id in ignored:
+        ignored.remove(pl_id)
     vibes["_ignored"] = ignored
     save_vibes(vibes)
     return jsonify({"ok": True})
@@ -272,20 +520,37 @@ def restore_playlist():
 
 @app.route("/api/playlists/rename", methods=["POST"])
 def rename_playlist():
+    """
+    Stores a user-defined display name for a playlist.
+    original_name: the current Rekordbox name (used to look up the ID)
+    new_display_name: the custom label the user wants to see
+    """
     data         = request.get_json()
     original     = (data.get("original_name") or "").strip()
     display_name = (data.get("new_display_name") or "").strip()
     if not original:
         return jsonify({"error": "original_name required"}), 400
-    vibes = load_vibes()
+    vibes = _load_and_migrate()
+    pl_id = _name_to_id(vibes, original)
+    if not pl_id:
+        return jsonify({"error": "Playlist not found"}), 404
     names = vibes.setdefault("_names", {})
     if display_name:
-        names[original] = display_name
+        names[pl_id] = display_name
     else:
-        names.pop(original, None)   # empty = revert to raw name
+        names.pop(pl_id, None)
     vibes["_names"] = names
     save_vibes(vibes)
     return jsonify({"ok": True})
+
+
+def _next_virtual_id(vibes):
+    """Generate a new unique virtual playlist ID like 'v_1', 'v_2', …"""
+    existing = vibes.get("_virtual", [])
+    n = 1
+    while f"v_{n}" in existing:
+        n += 1
+    return f"v_{n}"
 
 
 @app.route("/api/playlists/create", methods=["POST"])
@@ -295,16 +560,31 @@ def create_playlist():
     vibe = (data.get("vibe") or "").strip()
     if not name:
         return jsonify({"error": "name required"}), 400
-    vibes   = load_vibes()
+    vibes   = _load_and_migrate()
     virtual = vibes.get("_virtual", [])
     deleted = vibes.get("_deleted", [])
-    if name in deleted:
-        deleted.remove(name)
-        vibes["_deleted"] = deleted
-    if name not in virtual:
-        virtual.append(name)
-    vibes["_virtual"] = virtual
-    vibes[name] = vibe
+
+    # Check if a virtual playlist with this name already exists
+    existing_id = None
+    for v_id in virtual:
+        if v_id == name or vibes.get("_names", {}).get(v_id) == name:
+            existing_id = v_id
+            break
+
+    if existing_id:
+        pl_id = existing_id
+        if pl_id in deleted:
+            deleted.remove(pl_id)
+            vibes["_deleted"] = deleted
+    else:
+        pl_id = _next_virtual_id(vibes)
+        virtual.append(pl_id)
+        vibes["_virtual"] = virtual
+        # Store the user-given name as the display name
+        names = vibes.setdefault("_names", {})
+        names[pl_id] = name
+
+    vibes[pl_id] = vibe
     save_vibes(vibes)
     return jsonify({"ok": True})
 
@@ -315,25 +595,30 @@ def delete_playlist():
     name = (data.get("name") or "").strip()
     if not name:
         return jsonify({"error": "name required"}), 400
-    vibes   = load_vibes()
+    vibes   = _load_and_migrate()
     virtual = vibes.get("_virtual", [])
     deleted = vibes.get("_deleted", [])
-    if name in virtual:
-        virtual.remove(name)
+    pl_id   = _name_to_id(vibes, name)
+    if not pl_id:
+        return jsonify({"error": "Playlist not found"}), 404
+
+    if pl_id in virtual:
+        virtual.remove(pl_id)
         vibes["_virtual"] = virtual
-        vibes.pop(name, None)
-        vibes.get("_names", {}).pop(name, None)
+        vibes.pop(pl_id, None)
+        vibes.get("_names", {}).pop(pl_id, None)
     else:
-        if name not in deleted:
-            deleted.append(name)
+        if pl_id not in deleted:
+            deleted.append(pl_id)
         vibes["_deleted"] = deleted
-        vibes.pop(name, None)
-        vibes.get("_names", {}).pop(name, None)
-    # Also remove from _ignored if present
+        vibes.pop(pl_id, None)
+        vibes.get("_names", {}).pop(pl_id, None)
+
     ignored = vibes.get("_ignored", [])
-    if name in ignored:
-        ignored.remove(name)
+    if pl_id in ignored:
+        ignored.remove(pl_id)
         vibes["_ignored"] = ignored
+
     save_vibes(vibes)
     return jsonify({"ok": True})
 
@@ -344,7 +629,6 @@ def get_playlist_tracks(name):
         tree = ET.parse(get_xml_path())
         root = tree.getroot()
 
-        # Build track lookup from COLLECTION
         track_map = {}
         for t in root.find("COLLECTION"):
             tid = t.get("TrackID")
@@ -361,27 +645,30 @@ def get_playlist_tracks(name):
                 "location": t.get("Location", ""),
             }
 
-        # Find playlist node
+        vibes = _load_and_migrate()
+        pl_id = _name_to_id(vibes, name)
+
+        # Virtual playlist
+        if pl_id and pl_id in vibes.get("_virtual", []):
+            tracks = [
+                {
+                    "id":       tid,
+                    "name":     info.get("name", ""),
+                    "artist":   info.get("artist", ""),
+                    "bpm":      info.get("bpm", ""),
+                    "key":      info.get("key", ""),
+                    "album":    "", "year": "", "duration": "",
+                    "genre":    "", "location": "",
+                }
+                for tid, info in session_assignments.items()
+                if info.get("playlist") == name
+            ]
+            return jsonify(tracks)
+
+        # XML playlist — find by name
         playlists_root = root.find("PLAYLISTS")[0]
         node = next((n for n in playlists_root if n.get("Name") == name), None)
         if node is None:
-            # Virtual playlist (not yet exported to XML) — return session tracks
-            vibes = load_vibes()
-            if name in vibes.get("_virtual", []):
-                tracks = [
-                    {
-                        "id":       tid,
-                        "name":     info.get("name", ""),
-                        "artist":   info.get("artist", ""),
-                        "bpm":      info.get("bpm", ""),
-                        "key":      info.get("key", ""),
-                        "album":    "", "year": "", "duration": "",
-                        "genre":    "", "location": "",
-                    }
-                    for tid, info in session_assignments.items()
-                    if info.get("playlist") == name
-                ]
-                return jsonify(tracks)
             return jsonify({"error": "Playlist not found"}), 404
 
         tracks = []
@@ -392,7 +679,6 @@ def get_playlist_tracks(name):
                 tracks.append(track_map[tid])
                 xml_track_ids.add(tid)
 
-        # Inject session-assigned tracks not yet in XML
         for tid, info in session_assignments.items():
             if info.get("playlist") == name and tid not in xml_track_ids:
                 tracks.append({
@@ -413,11 +699,12 @@ def get_playlist_tracks(name):
 
 @app.route("/api/inbox")
 def get_inbox():
-    vibes = load_vibes()
-    inbox_name = vibes.get("_inbox")
-    if not inbox_name:
+    vibes    = _load_and_migrate()
+    inbox_id = vibes.get("_inbox")
+    if not inbox_id:
         return jsonify({"name": None, "tracks": []})
-    xml_path = get_xml_path()
+    inbox_name = _id_to_name(vibes, inbox_id)
+    xml_path   = get_xml_path()
     if not os.path.exists(xml_path):
         return jsonify({"name": None, "tracks": []})
     try:
@@ -455,9 +742,10 @@ def get_inbox():
 @app.route("/api/set-inbox", methods=["POST"])
 def set_inbox():
     name  = request.get_json().get("name")
-    vibes = load_vibes()
+    vibes = _load_and_migrate()
     if name:
-        vibes["_inbox"] = name
+        pl_id = _name_to_id(vibes, name)
+        vibes["_inbox"] = pl_id if pl_id else name
     else:
         vibes.pop("_inbox", None)
     save_vibes(vibes)
@@ -555,11 +843,10 @@ def export_xml():
     playlists_node = root.find("PLAYLISTS")
     if playlists_node is None or len(playlists_node) == 0:
         return jsonify({"error": "El XML no tiene nodo PLAYLISTS válido."}), 400
-    playlists_root = playlists_node[0]  # ROOT node
+    playlists_root = playlists_node[0]
 
     placed = 0
     for track_id, info in session_assignments.items():
-        # Add to target playlist
         playlist_name = info["playlist"]
         node = next(
             (n for n in playlists_root if n.get("Name") == playlist_name),
@@ -575,7 +862,6 @@ def export_xml():
             node.set("Entries", str(len(node.findall("TRACK"))))
             placed += 1
 
-        # Remove from source (queue) playlist
         source = info.get("source_playlist")
         if source:
             src_node = next(
@@ -590,12 +876,18 @@ def export_xml():
                         break
 
     # Reorder playlist nodes in XML to match user-defined order
-    vibes = load_vibes()
+    vibes = _load_and_migrate()
     order = vibes.get("_order", [])
+    id_map = _get_id_map(vibes)
     if order:
+        # Build name-based order for sorting XML nodes
+        id_to_pos = {pl_id: i for i, pl_id in enumerate(order)}
+        # name → position via id_map
+        name_to_pos = {name: id_to_pos[pl_id]
+                       for pl_id, name in id_map.items()
+                       if pl_id in id_to_pos}
         playlist_nodes = list(playlists_root)
-        order_map = {name: i for i, name in enumerate(order)}
-        playlist_nodes.sort(key=lambda n: order_map.get(n.get("Name", ""), len(order)))
+        playlist_nodes.sort(key=lambda n: name_to_pos.get(n.get("Name", ""), len(order)))
         for child in playlist_nodes:
             playlists_root.remove(child)
         for child in playlist_nodes:
@@ -619,19 +911,15 @@ def export_xml():
 
 
 def location_to_path(location):
-    """Convert Rekordbox Location URL to OS file path."""
-    # file://localhost/D:/... → D:/...
     path = unquote(location)
     for prefix in ("file://localhost/", "file:///", "file://"):
         if path.startswith(prefix):
             path = path[len(prefix):]
             break
-    # Normalise slashes on Windows
     return os.path.normpath(path)
 
 
 def find_track_path(track_id):
-    """Return (os_path, mime) for a given TrackID, or (None, None)."""
     try:
         tree = ET.parse(get_xml_path())
         root = tree.getroot()
@@ -702,22 +990,34 @@ def xml_info():
 def set_xml_route():
     global session_assignments, session_modified_playlists
 
-    # Option A: file upload
     if "file" in request.files:
         f = request.files["file"]
         if not f.filename.lower().endswith(".xml"):
             return jsonify({"error": "Solo se aceptan archivos .xml"}), 400
-        fname = os.path.basename(f.filename) or "Rekordbox_custom.xml"
+        fname     = os.path.basename(f.filename) or "Rekordbox_custom.xml"
         save_path = os.path.join(BASE, fname)
         f.save(save_path)
-        vibes = load_vibes()
-        vibes["_xml_path"] = save_path
-        save_vibes(vibes)
-        session_assignments = {}
+
+        # Parse XML and update/migrate vibes
+        try:
+            tree     = ET.parse(save_path)
+            xml_root = tree.getroot()
+            vibes    = load_vibes()
+            if _is_old_format(vibes):
+                vibes = migrate_vibes_to_id_keys(vibes, xml_root)
+            else:
+                vibes = refresh_id_map(vibes, xml_root)
+            vibes["_xml_path"] = save_path
+            save_vibes(vibes)
+        except Exception:
+            vibes = load_vibes()
+            vibes["_xml_path"] = save_path
+            save_vibes(vibes)
+
+        session_assignments        = {}
         session_modified_playlists = set()
         return jsonify({"ok": True, "filename": fname})
 
-    # Option B: path string
     data = request.get_json(silent=True) or {}
     path = (data.get("path") or "").strip()
     if not path:
@@ -726,10 +1026,23 @@ def set_xml_route():
         return jsonify({"error": "Solo se aceptan archivos .xml"}), 400
     if not os.path.exists(path):
         return jsonify({"error": "Archivo no encontrado"}), 400
-    vibes = load_vibes()
-    vibes["_xml_path"] = path
-    save_vibes(vibes)
-    session_assignments = {}
+
+    try:
+        tree     = ET.parse(path)
+        xml_root = tree.getroot()
+        vibes    = load_vibes()
+        if _is_old_format(vibes):
+            vibes = migrate_vibes_to_id_keys(vibes, xml_root)
+        else:
+            vibes = refresh_id_map(vibes, xml_root)
+        vibes["_xml_path"] = path
+        save_vibes(vibes)
+    except Exception:
+        vibes = load_vibes()
+        vibes["_xml_path"] = path
+        save_vibes(vibes)
+
+    session_assignments        = {}
     session_modified_playlists = set()
     return jsonify({"ok": True, "filename": os.path.basename(path)})
 
@@ -748,6 +1061,7 @@ def startup():
     xml_save  = os.path.join(BASE, xml_fname)
     xml_file.save(xml_save)
 
+    # Parse vibes file if provided
     if "vibes" in request.files:
         try:
             vibes_data = json.loads(request.files["vibes"].read().decode("utf-8"))
@@ -757,6 +1071,17 @@ def startup():
             vibes_data = {}
     else:
         vibes_data = {}
+
+    # Parse XML, migrate/refresh vibes
+    try:
+        tree     = ET.parse(xml_save)
+        xml_root = tree.getroot()
+        if _is_old_format(vibes_data):
+            vibes_data = migrate_vibes_to_id_keys(vibes_data, xml_root)
+        else:
+            vibes_data = refresh_id_map(vibes_data, xml_root)
+    except Exception:
+        pass  # If XML parse fails, proceed with vibes as-is
 
     vibes_data["_xml_path"] = xml_save
     save_vibes(vibes_data)
@@ -768,12 +1093,12 @@ def startup():
 
 @app.route("/api/vibes")
 def get_vibes():
-    return jsonify(load_vibes())
+    return jsonify(_load_and_migrate())
 
 
 @app.route("/api/vibes/export")
 def export_vibes():
-    vibes = load_vibes()
+    vibes = _load_and_migrate()
     return Response(
         json.dumps(vibes, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -794,7 +1119,13 @@ def import_vibes():
         return jsonify({"error": "Archivo JSON inválido"}), 400
     if not isinstance(data, dict):
         return jsonify({"error": "Formato incorrecto"}), 400
+    # Preserve the current xml_path
+    current_vibes = load_vibes()
+    if "_xml_path" in current_vibes:
+        data.setdefault("_xml_path", current_vibes["_xml_path"])
     save_vibes(data)
+    # Trigger migration if XML is available
+    _load_and_migrate()
     return jsonify({"ok": True})
 
 
