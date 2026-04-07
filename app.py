@@ -281,6 +281,20 @@ def rename_playlist():
     names = vibes.setdefault("_names", {})
     if display_name:
         names[original] = display_name
+        # Migrate the JSON key so it matches the new XML name after export
+        new_name = display_name
+        if original != new_name:
+            if original in vibes:
+                vibes[new_name] = vibes.pop(original)
+            for meta_key in ("_ignored", "_order", "_virtual", "_deleted"):
+                lst = vibes.get(meta_key, [])
+                if original in lst:
+                    lst[lst.index(original)] = new_name
+                    vibes[meta_key] = lst
+            if vibes.get("_inbox") == original:
+                vibes["_inbox"] = new_name
+            names.pop(new_name, None)   # no need to store display name for new key
+            names.pop(original, None)
     else:
         names.pop(original, None)   # empty = revert to raw name
     vibes["_names"] = names
