@@ -539,9 +539,6 @@ def get_session():
 
 @app.route("/api/export", methods=["POST"])
 def export_xml():
-    if not session_assignments:
-        return jsonify({"error": "No assignments to export"}), 400
-
     xml_path = get_xml_path()
     if not xml_path or not os.path.exists(xml_path):
         return jsonify({"error": "XML no encontrado. Sube tu Rekordbox.xml antes de exportar."}), 400
@@ -600,6 +597,13 @@ def export_xml():
             playlists_root.remove(child)
         for child in playlist_nodes:
             playlists_root.append(child)
+
+    # Apply display name renames to XML nodes
+    names_map = vibes.get("_names", {})
+    for node in playlists_root:
+        original = node.get("Name", "")
+        if original in names_map:
+            node.set("Name", names_map[original])
 
     try:
         import io
