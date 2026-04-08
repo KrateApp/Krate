@@ -17,8 +17,19 @@ app = Flask(__name__)
 CORS(app)
 
 # Busca el XML de Rekordbox en la misma carpeta que este archivo
-BASE    = os.path.dirname(os.path.abspath(__file__))
-XML_PATH = os.path.join(BASE, "Rekordbox.xml")
+# Acepta cualquier archivo que empiece con "Rekordbox" y termine en ".xml"
+# Si hay varios, usa el más reciente
+import glob
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+
+def find_xml():
+    candidates = glob.glob(os.path.join(BASE, "Rekordbox*.xml"))
+    if not candidates:
+        return os.path.join(BASE, "Rekordbox.xml")  # fallback para el aviso
+    return max(candidates, key=os.path.getmtime)
+
+XML_PATH = find_xml()
 
 
 def location_to_path(location):
@@ -100,8 +111,11 @@ if __name__ == "__main__":
     print("║   Deja esta ventana abierta          ║")
     print("╚══════════════════════════════════════╝\n")
     if not os.path.exists(XML_PATH):
-        print("  AVISO: No se encontro Rekordbox.xml en esta carpeta.")
-        print("  Copia tu Rekordbox.xml aqui para que el audio funcione:")
+        print("  AVISO: No se encontro ningun Rekordbox*.xml en esta carpeta.")
+        print("  Copia tu XML de Rekordbox aqui para que el audio funcione:")
         print(f"  {BASE}")
+        print()
+    else:
+        print(f"  XML: {os.path.basename(XML_PATH)}")
         print()
     app.run(host="127.0.0.1", port=5001, debug=False)

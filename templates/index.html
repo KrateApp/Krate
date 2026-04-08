@@ -672,6 +672,28 @@ body{font-family:var(--font-sans,system-ui);margin:0}
       </div>
     </div>
 
+      <div style="border-top:1px solid #1A1914;padding-top:14px;margin-top:2px">
+        <div class="sort-label" style="margin-bottom:8px">
+          SERVIDOR DE AUDIO LOCAL
+          <span style="font-size:9px;color:#6A6858;letter-spacing:1px;margin-left:6px">NECESARIO PARA REPRODUCIR</span>
+        </div>
+        <div style="font-size:10px;color:#6A6858;line-height:1.6;margin-bottom:10px">
+          Krate necesita un pequeño programa corriendo en tu computadora para reproducir tu música.<br>
+          Solo necesitas hacerlo una vez — descárgalo, ponlo junto a tu Rekordbox.xml y ejecútalo con doble clic.
+        </div>
+        <div style="display:flex;gap:8px">
+          <a href="/download/krate_audio.bat" style="flex:1;text-align:center;padding:8px;font-size:10px;letter-spacing:1.5px;color:#C8C4B8;border:1px solid #1A1914;border-radius:2px;text-decoration:none;cursor:pointer">
+            DESCARGAR (WINDOWS)
+          </a>
+          <a href="/download/krate_audio.py" style="flex:1;text-align:center;padding:8px;font-size:10px;letter-spacing:1.5px;color:#6A6858;border:1px solid #1A1914;border-radius:2px;text-decoration:none;cursor:pointer">
+            DESCARGAR (.PY)
+          </a>
+        </div>
+        <div id="audio-server-status" style="font-size:10px;color:#3A3830;margin-top:8px;letter-spacing:0.5px">
+          Verificando servidor de audio...
+        </div>
+      </div>
+
     <div id="startup-result" style="min-height:20px;font-size:11px;color:#6A6858;margin-top:12px"></div>
     <button id="startup-btn" class="btn-primary" style="width:100%;padding:10px;font-size:12px;letter-spacing:2px;opacity:0.4;cursor:not-allowed;margin-top:4px" disabled onclick="startupSubmit()">INICIAR SESIÓN</button>
   </div>
@@ -2677,6 +2699,23 @@ function startupHandleVibes(input) {
   document.getElementById('startup-vibes-label').textContent = file.name;
   document.getElementById('startup-vibes-zone').classList.add('has-file');
 }
+
+async function checkAudioServer() {
+  const el = document.getElementById('audio-server-status');
+  try {
+    const res = await fetch('http://localhost:5001/ping', { signal: AbortSignal.timeout(2000) });
+    if (res.ok) {
+      el.style.color = '#4A7A4A';
+      el.textContent = '✓ Servidor de audio activo — el audio funcionará correctamente';
+      return;
+    }
+  } catch(_) {}
+  el.style.color = '#6A6858';
+  el.textContent = 'Servidor no detectado — descarga y ejecuta el archivo de arriba para reproducir audio';
+}
+
+// Verificar servidor al abrir la página
+checkAudioServer();
 
 async function startupSubmit() {
   if (!_startupXmlFile) return;
