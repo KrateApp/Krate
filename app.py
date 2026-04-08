@@ -720,6 +720,19 @@ def xml_info():
 def set_xml_route():
     global session_assignments, session_modified_playlists
 
+    def _clean_virtual_from_xml(xml_path, vibes):
+        """Remove from _virtual any playlists that now exist in the XML."""
+        try:
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            xml_names = {node.get("Name") for node in root.find("PLAYLISTS")[0] if node.get("Name")}
+            virtual = vibes.get("_virtual", [])
+            cleaned = [v for v in virtual if v not in xml_names]
+            if len(cleaned) != len(virtual):
+                vibes["_virtual"] = cleaned
+        except Exception:
+            pass
+
     # Option A: file upload
     if "file" in request.files:
         f = request.files["file"]
@@ -730,6 +743,7 @@ def set_xml_route():
         f.save(save_path)
         vibes = load_vibes()
         vibes["_xml_path"] = save_path
+        _clean_virtual_from_xml(save_path, vibes)
         save_vibes(vibes)
         session_assignments = {}
         session_modified_playlists = set()
@@ -746,6 +760,7 @@ def set_xml_route():
         return jsonify({"error": "Archivo no encontrado"}), 400
     vibes = load_vibes()
     vibes["_xml_path"] = path
+    _clean_virtual_from_xml(path, vibes)
     save_vibes(vibes)
     session_assignments = {}
     session_modified_playlists = set()
