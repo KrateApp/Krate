@@ -93,6 +93,14 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .no-match p{font-size:12px;color:#6A6858;line-height:1.8}
 @keyframes krate-pulse{0%,100%{opacity:.4}50%{opacity:1}}
 .matching-state{font-size:11px;color:#6A6858;letter-spacing:2px;padding:20px;text-align:center;animation:krate-pulse 1.2s ease-in-out infinite}
+/* Suggestions recede-to-background while refining */
+@keyframes krate-recede{from{opacity:1;transform:scale(1) translateY(0);filter:blur(0px)}to{opacity:0.18;transform:scale(0.93) translateY(-6px);filter:blur(2.5px)}}
+@keyframes krate-recede-out{from{opacity:0.18;transform:scale(0.93) translateY(-6px);filter:blur(2.5px)}to{opacity:0;transform:scale(0.9) translateY(-10px);filter:blur(4px)}}
+@keyframes krate-slide-in-below{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.result-card.receding{animation:krate-recede 300ms cubic-bezier(0.4,0,0.2,1) forwards;pointer-events:none}
+.result-card.receding-out{animation:krate-recede-out 220ms cubic-bezier(0.4,0,1,1) forwards;pointer-events:none}
+.result-card.entering{opacity:0;animation:krate-slide-in-below 260ms cubic-bezier(0.16,1,0.3,1) forwards}
+.result-card.best.entering{animation:krate-slide-in-below 260ms cubic-bezier(0.16,1,0.3,1) forwards,krate-border-draw 300ms cubic-bezier(0.16,1,0.3,1) forwards}
 
 /* vibe setup panel */
 .vibe-list{display:flex;flex-direction:column;gap:3px}
@@ -1456,11 +1464,32 @@ async function doMatch() {
   stopVoice('sort');
   openSuggestionsDrawer();
 
-  const btn = document.getElementById('match-btn');
-  btn.textContent = 'Matching...';
-  btn.disabled    = true;
-  document.getElementById('results-area').innerHTML =
-    '<div class="matching-state">BUSCANDO<span class="krate-dots"><span>·</span><span>·</span><span>·</span></span></div>';
+  const btn         = document.getElementById('match-btn');
+  const resultsArea = document.getElementById('results-area');
+  btn.textContent   = 'Matching...';
+  btn.disabled      = true;
+
+  // If there are existing result cards, recede them instead of clearing immediately
+  const existingCards = resultsArea.querySelectorAll('.result-card');
+  const isRefinement  = existingCards.length > 0;
+
+  if (isRefinement) {
+    existingCards.forEach(card => {
+      card.classList.remove('receding-out');
+      card.classList.add('receding');
+    });
+    // Overlay a loading indicator on top without replacing the cards
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id        = 'refine-loading';
+    loadingOverlay.className = 'matching-state';
+    loadingOverlay.style.cssText = 'position:absolute;bottom:12px;left:0;right:0;pointer-events:none';
+    loadingOverlay.innerHTML = 'REFINANDO<span class="krate-dots"><span>·</span><span>·</span><span>·</span></span>';
+    resultsArea.style.position = 'relative';
+    resultsArea.appendChild(loadingOverlay);
+  } else {
+    resultsArea.innerHTML =
+      '<div class="matching-state">BUSCANDO<span class="krate-dots"><span>·</span><span>·</span><span>·</span></span></div>';
+  }
 
   try {
     const res  = await fetch('/api/match', {
@@ -1470,21 +1499,40 @@ async function doMatch() {
     });
     const data = await res.json();
     if (data.error === 'overloaded') {
-      document.getElementById('results-area').innerHTML =
+      resultsArea.innerHTML =
         '<div class="no-match"><p>' + esc(data.message) + '</p>'
         + '<button class="btn-primary" style="margin-top:12px;font-size:11px;padding:6px 14px" onclick="doMatch()">Reintentar</button></div>';
       return;
     }
     if (data.error) throw new Error(data.error);
-    // Accumulate suggestions to exclude in next refinement
-    const newSuggestions = state.mode === 'auto'
-      ? (data.playlist ? [data.playlist] : [])
-      : (data.suggestions || []).map(s => s.playlist);
-    state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), ...newSuggestions])];
-    renderResults(data);
+
+    if (isRefinement) {
+      // Fade receding cards fully out, then render new ones sliding in
+      const receding = resultsArea.querySelectorAll('.result-card.receding');
+      receding.forEach(card => {
+        card.classList.remove('receding');
+        card.classList.add('receding-out');
+      });
+      setTimeout(() => {
+        resultsArea.style.position = '';
+        const overlay = document.getElementById('refine-loading');
+        if (overlay) overlay.remove();
+        const newSuggestions2 = state.mode === 'auto'
+          ? (data.playlist ? [data.playlist] : [])
+          : (data.suggestions || []).map(s => s.playlist);
+        state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), ...newSuggestions2])];
+        renderResults(data, true);
+      }, 220);
+    } else {
+      const newSuggestions = state.mode === 'auto'
+        ? (data.playlist ? [data.playlist] : [])
+        : (data.suggestions || []).map(s => s.playlist);
+      state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), ...newSuggestions])];
+      renderResults(data, false);
+    }
   } catch(e) {
-    document.getElementById('results-area').innerHTML =
-      '<div class="err-state">' + esc(e.message) + '</div>';
+    resultsArea.style.position = '';
+    resultsArea.innerHTML = '<div class="err-state">' + esc(e.message) + '</div>';
   } finally {
     btn.textContent = 'Match';
     btn.disabled    = false;
@@ -1501,7 +1549,7 @@ function pulsePlaylistTitle(playlist) {
   el.addEventListener('animationend', () => el.classList.remove('pl-title-pop'), {once: true});
 }
 
-function renderResults(data) {
+function renderResults(data, entering = false) {
   let suggestions = [];
 
   if (state.mode === 'auto') {
@@ -1516,8 +1564,10 @@ function renderResults(data) {
     return;
   }
 
+  const enterClass = entering ? ' entering' : '';
+
   let html = suggestions.map((s, i) =>
-    '<div class="result-card ' + (i === 0 ? 'best' : '') + '" id="res-' + i + '">'
+    '<div class="result-card ' + (i === 0 ? 'best' : '') + enterClass + '" id="res-' + i + '">'
     + '<div class="result-rank ' + (i === 0 ? 'best' : '') + '">0' + (i + 1) + '</div>'
     + '<div style="flex:1;min-width:0">'
     + '<div class="result-name' + (i > 0 ? ' dim' : '') + '">' + esc(playlistDisplayName(s.playlist)) + '</div>'
@@ -1535,7 +1585,7 @@ function renderResults(data) {
     const safeVibe = esc(np.vibe).replace(/'/g, "\\'");
     const isCreate = data.intent === 'create';
     html +=
-      '<div class="result-card result-card--create' + (isCreate ? ' result-card--create-primary' : '') + '" id="res-new">'
+      '<div class="result-card result-card--create' + (isCreate ? ' result-card--create-primary' : '') + enterClass + '" id="res-new">'
       + '<div class="result-rank" style="color:' + (isCreate ? '#FF3D1A' : '#6A6858') + '">' + (isCreate ? '✦' : '+') + '</div>'
       + '<div style="flex:1;min-width:0">'
       + '<div class="result-name" style="color:' + (isCreate ? '#C8C4B8' : '#9A9880') + '">' + (isCreate ? '' : 'Crear: ') + esc(np.name) + '</div>'
@@ -1549,7 +1599,7 @@ function renderResults(data) {
 
   document.getElementById('results-area').innerHTML = html;
   document.querySelectorAll('#results-area .result-card').forEach((card, i) => {
-    card.style.animationDelay = `${i * 70}ms`;
+    card.style.animationDelay = entering ? `${i * 80}ms` : `${i * 70}ms`;
   });
 }
 
