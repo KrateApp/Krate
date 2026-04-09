@@ -251,11 +251,17 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 #inbox-active{overflow:hidden;flex:1;min-height:0}
 #inbox-main{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:16px;overflow:hidden}
 #inbox-main .track-browser{flex:1 1 0;min-height:0;max-height:none}
-#inbox-drawer{flex:0 0 0;overflow:hidden;transition:flex-basis 420ms cubic-bezier(0.16,1,0.3,1)}
+#inbox-drawer{flex:0 0 0;display:flex;flex-direction:column;overflow:hidden;transition:flex-basis 420ms cubic-bezier(0.16,1,0.3,1)}
+#inbox-drawer.has-results{flex-basis:28px}
 #inbox-drawer.open{flex-basis:44%}
-#inbox-drawer-inner{display:flex;flex-direction:column;gap:12px;padding-top:12px;height:100%;overflow:hidden;transform:translateY(24px);opacity:0;transition:transform 420ms cubic-bezier(0.16,1,0.3,1),opacity 360ms ease}
+#inbox-drawer-header{flex-shrink:0;padding-top:10px}
+#inbox-drawer-inner{flex:1;display:flex;flex-direction:column;gap:12px;padding-top:8px;min-height:0;overflow:hidden;transform:translateY(16px);opacity:0;transition:transform 360ms cubic-bezier(0.16,1,0.3,1),opacity 280ms ease}
 #inbox-drawer.open #inbox-drawer-inner{transform:translateY(0);opacity:1}
 #inbox-drawer #results-area{flex:1;overflow-y:auto;min-height:0}
+#drawer-toggle-btn{cursor:pointer;color:var(--text-dim);font-size:15px;line-height:1;padding:0 2px;transition:color 0.15s}
+#drawer-toggle-btn:hover{color:var(--text)}
+/* When closed with results: show a peek tab above the drawer */
+#inbox-drawer.has-results:not(.open) #drawer-toggle-btn{display:inline-block;position:absolute;top:-26px;right:0}
 .inbox-placed { opacity: 0.3; cursor: pointer; transition: opacity 150ms ease; }
 .inbox-placed:hover { opacity: 0.65; }
 .inbox-restore-hint { color: #3A3830; font-size: 10px; margin-left: 6px; letter-spacing: 0.5px; transition: color 150ms ease; }
@@ -543,14 +549,14 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 
         <!-- Suggestions drawer: slides up from bottom -->
         <div id="inbox-drawer">
+          <div id="inbox-drawer-header">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div class="results-label" style="flex:1">SUGERENCIAS</div>
+              <span id="drawer-toggle-btn" onclick="toggleSuggestionsDrawer()" title="Cerrar">×</span>
+            </div>
+          </div>
           <div id="inbox-drawer-inner">
-            <div class="results-label" style="display:flex;align-items:center;justify-content:space-between">
-              <span>SUGERENCIAS</span>
-              <span id="drawer-toggle-btn" onclick="toggleSuggestionsDrawer()" style="cursor:pointer;color:var(--text-dim);font-size:16px;line-height:1;padding:0 2px" title="Cerrar">×</span>
-            </div>
-            <div id="results-area">
-              <div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>
-            </div>
+            <div id="results-area"></div>
           </div>
         </div>
 
@@ -1070,7 +1076,7 @@ function selectInboxTrack(id) {
   if (!t) return;
   if (!state.selected || state.selected.id !== t.id) {
     state.priorSuggestions = [];
-    closeSuggestionsDrawer();
+    resetSuggestionsDrawer();
   }
   state.selected     = t;
   state.selectedFrom = state.inbox;
@@ -1092,7 +1098,7 @@ function selectTrackById(id) {
   if (!t) return;
   if (!state.selected || state.selected.id !== t.id) {
     state.priorSuggestions = [];
-    closeSuggestionsDrawer();
+    resetSuggestionsDrawer();
   }
   state.selected = t;
   const chip = document.getElementById('selected-chip');
@@ -1665,7 +1671,7 @@ async function placeTrack(idx, playlist) {
 
 function openSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
-  if (d) d.classList.add('open');
+  if (d) { d.classList.add('has-results', 'open'); }
   const btn = document.getElementById('drawer-toggle-btn');
   if (btn) { btn.textContent = '×'; btn.title = 'Cerrar'; }
 }
@@ -1674,6 +1680,10 @@ function closeSuggestionsDrawer() {
   if (d) d.classList.remove('open');
   const btn = document.getElementById('drawer-toggle-btn');
   if (btn) { btn.textContent = '↑'; btn.title = 'Ver sugerencias'; }
+}
+function resetSuggestionsDrawer() {
+  const d = document.getElementById('inbox-drawer');
+  if (d) d.classList.remove('has-results', 'open');
 }
 function toggleSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
