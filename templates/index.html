@@ -1475,7 +1475,12 @@ async function doMatch() {
 
   if (isRefinement) {
     existingCards.forEach(card => {
-      card.classList.remove('receding-out');
+      // Strip any frozen animation so recede always starts from current visual state
+      card.style.animation = 'none';
+      card.style.animationDelay = '';
+      void card.offsetWidth; // force reflow
+      card.style.animation = '';
+      card.classList.remove('receding-out', 'entering');
       card.classList.add('receding');
     });
     // Overlay a loading indicator on top without replacing the cards
