@@ -536,7 +536,10 @@ body{font-family:var(--font-sans,system-ui);margin:0}
         <!-- Suggestions drawer: slides up from bottom -->
         <div id="inbox-drawer">
           <div id="inbox-drawer-inner">
-            <div class="results-label">SUGERENCIAS</div>
+            <div class="results-label" style="display:flex;align-items:center;justify-content:space-between">
+              <span>SUGERENCIAS</span>
+              <span onclick="closeSuggestionsDrawer()" style="cursor:pointer;color:var(--text-dim);font-size:16px;line-height:1;padding:0 2px" title="Cerrar">×</span>
+            </div>
             <div id="results-area">
               <div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>
             </div>
@@ -1057,7 +1060,10 @@ function renderSidebar() {
 function selectInboxTrack(id) {
   const t = state.inboxTracks.find(tr => tr.id === id);
   if (!t) return;
-  if (!state.selected || state.selected.id !== t.id) state.priorSuggestions = [];
+  if (!state.selected || state.selected.id !== t.id) {
+    state.priorSuggestions = [];
+    closeSuggestionsDrawer();
+  }
   state.selected     = t;
   state.selectedFrom = state.inbox;
   renderInboxTracks();
@@ -1076,7 +1082,10 @@ function selectTrackById(id) {
   const t = (state.playlistDetailTracks || []).find(tr => tr.id === id)
          || state.inboxTracks.find(tr => tr.id === id);
   if (!t) return;
-  if (!state.selected || state.selected.id !== t.id) state.priorSuggestions = [];
+  if (!state.selected || state.selected.id !== t.id) {
+    state.priorSuggestions = [];
+    closeSuggestionsDrawer();
+  }
   state.selected = t;
   const chip = document.getElementById('selected-chip');
   if (chip) chip.textContent = '— ' + t.artist + ' · ' + t.name;
