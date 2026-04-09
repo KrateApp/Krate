@@ -179,9 +179,10 @@ def do_match():
     # Lazy import so Anthropic client is only created on first match call
     from krate import match_vibe, create_vibe
 
-    data        = request.get_json()
-    description = (data.get("description") or "").strip()
-    mode        = data.get("mode", "review")
+    data               = request.get_json()
+    description        = (data.get("description") or "").strip()
+    mode               = data.get("mode", "review")
+    excluded_playlists = data.get("excluded_playlists") or []
 
     if not description:
         return jsonify({"error": "No description provided"}), 400
@@ -217,8 +218,11 @@ def do_match():
     if not active_vibes:
         return jsonify({"error": "No vibes set up yet"}), 400
 
+    # Resolve excluded internal names to display names for the prompt
+    excluded_display = [_display_name(p, names_map) for p in excluded_playlists if p]
+
     try:
-        result = match_vibe(description, active_vibes, mode=mode)
+        result = match_vibe(description, active_vibes, mode=mode, excluded_playlists=excluded_display)
         # Resolve display names back to internal names
         if mode == "auto":
             pl = result.get("playlist", "")

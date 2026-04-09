@@ -755,6 +755,7 @@ const state = {
   currentPlaylistName:  null,   // name of currently open playlist detail
   selected:             null,
   selectedFrom:         null,   // playlist name the current track came from
+  priorSuggestions:     [],     // playlists already suggested for current track (excluded on retry)
   session:              {},
   lastPlaced:           null,   // track id of most recently placed track (for flash anim)
 };
@@ -1056,6 +1057,7 @@ function renderSidebar() {
 function selectInboxTrack(id) {
   const t = state.inboxTracks.find(tr => tr.id === id);
   if (!t) return;
+  if (!state.selected || state.selected.id !== t.id) state.priorSuggestions = [];
   state.selected     = t;
   state.selectedFrom = state.inbox;
   renderInboxTracks();
@@ -1074,6 +1076,7 @@ function selectTrackById(id) {
   const t = (state.playlistDetailTracks || []).find(tr => tr.id === id)
          || state.inboxTracks.find(tr => tr.id === id);
   if (!t) return;
+  if (!state.selected || state.selected.id !== t.id) state.priorSuggestions = [];
   state.selected = t;
   const chip = document.getElementById('selected-chip');
   if (chip) chip.textContent = '— ' + t.artist + ' · ' + t.name;
@@ -1454,7 +1457,7 @@ async function doMatch() {
     const res  = await fetch('/api/match', {
       method:  'POST',
       headers: {'Content-Type':'application/json'},
-      body:    JSON.stringify({description: desc, mode: state.mode})
+      body:    JSON.stringify({description: desc, mode: state.mode, excluded_playlists: state.priorSuggestions || []})
     });
     const data = await res.json();
     if (data.error === 'overloaded') {
@@ -1464,6 +1467,11 @@ async function doMatch() {
       return;
     }
     if (data.error) throw new Error(data.error);
+    // Accumulate suggestions to exclude in next refinement
+    const newSuggestions = state.mode === 'auto'
+      ? (data.playlist ? [data.playlist] : [])
+      : (data.suggestions || []).map(s => s.playlist);
+    state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), ...newSuggestions])];
     renderResults(data);
   } catch(e) {
     document.getElementById('results-area').innerHTML =
@@ -2036,7 +2044,7 @@ async function doDialogMatch() {
     const res  = await fetch('/api/match', {
       method:  'POST',
       headers: {'Content-Type':'application/json'},
-      body:    JSON.stringify({description: desc, mode: state.mode})
+      body:    JSON.stringify({description: desc, mode: state.mode, excluded_playlists: state.priorSuggestions || []})
     });
     const data = await res.json();
     if (data.error === 'overloaded') {
@@ -2046,6 +2054,11 @@ async function doDialogMatch() {
       return;
     }
     if (data.error) throw new Error(data.error);
+    // Accumulate suggestions to exclude in next refinement
+    const newSuggestions = state.mode === 'auto'
+      ? (data.playlist ? [data.playlist] : [])
+      : (data.suggestions || []).map(s => s.playlist);
+    state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), ...newSuggestions])];
     renderDialogResults(data);
   } catch(e) {
     document.getElementById('dialog-results-area').innerHTML =

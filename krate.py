@@ -61,7 +61,7 @@ def save_vibes(vibes):
 # VIBE MATCHING  (the actual AI call)
 # ---------------------------------------------------------------
 
-def match_vibe(song_description: str, playlist_vibes: dict, mode: str = "review"):
+def match_vibe(song_description: str, playlist_vibes: dict, mode: str = "review", excluded_playlists: list = None):
     """
     Send a song description + playlist vibes to Claude.
     Returns parsed JSON — either a single suggestion (auto)
@@ -73,11 +73,16 @@ def match_vibe(song_description: str, playlist_vibes: dict, mode: str = "review"
         for name, vibe in playlist_vibes.items()
     )
 
+    excluded_block = ""
+    if excluded_playlists:
+        excluded_list = ", ".join(f'"{p}"' for p in excluded_playlists)
+        excluded_block = f"\nIMPORTANT: The user already saw suggestions for {excluded_list} and wants different options. Do NOT suggest any of those playlists. Explore other options.\n"
+
     if mode == "auto":
         prompt = f"""You are Krate, a vibe-based DJ playlist sorter.
 Your job is to match tracks to playlists based on feeling and energy — not genre tags.
 The track description may be in any language — English, Spanish, or anything else. Understand it as-is and write your reason in the same language.
-
+{excluded_block}
 TRACK DESCRIPTION:
 {song_description}
 
@@ -93,7 +98,7 @@ Respond with JSON only — no markdown, no explanation outside the JSON:
         prompt = f"""You are Krate, a vibe-based DJ playlist sorter.
 Your job is to match tracks to playlists based on feeling and energy — not genre tags.
 The track description may be in any language — English, Spanish, or anything else. Understand it as-is and write your reasons in the same language.
-
+{excluded_block}
 TRACK DESCRIPTION:
 {song_description}
 
