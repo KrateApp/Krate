@@ -546,7 +546,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
           <div id="inbox-drawer-inner">
             <div class="results-label" style="display:flex;align-items:center;justify-content:space-between">
               <span>SUGERENCIAS</span>
-              <span onclick="closeSuggestionsDrawer()" style="cursor:pointer;color:var(--text-dim);font-size:16px;line-height:1;padding:0 2px" title="Cerrar">×</span>
+              <span id="drawer-toggle-btn" onclick="toggleSuggestionsDrawer()" style="cursor:pointer;color:var(--text-dim);font-size:16px;line-height:1;padding:0 2px" title="Cerrar">×</span>
             </div>
             <div id="results-area">
               <div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>
@@ -1661,10 +1661,20 @@ async function placeTrack(idx, playlist) {
 function openSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
   if (d) d.classList.add('open');
+  const btn = document.getElementById('drawer-toggle-btn');
+  if (btn) { btn.textContent = '×'; btn.title = 'Cerrar'; }
 }
 function closeSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
   if (d) d.classList.remove('open');
+  const btn = document.getElementById('drawer-toggle-btn');
+  if (btn) { btn.textContent = '↑'; btn.title = 'Ver sugerencias'; }
+}
+function toggleSuggestionsDrawer() {
+  const d = document.getElementById('inbox-drawer');
+  if (!d) return;
+  if (d.classList.contains('open')) closeSuggestionsDrawer();
+  else openSuggestionsDrawer();
 }
 
 function skipResult(idx) {
