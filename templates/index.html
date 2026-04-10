@@ -263,8 +263,6 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 #drawer-toggle-btn:hover{opacity:1}
 .inbox-placed { opacity: 0.3; cursor: pointer; transition: opacity 150ms ease; }
 .inbox-placed:hover { opacity: 0.65; }
-.inbox-restore-hint { color: #3A3830; font-size: 10px; margin-left: 6px; letter-spacing: 0.5px; transition: color 150ms ease; }
-.inbox-placed:hover .inbox-restore-hint { color: #9A9880; }
 
 
 /* 1. Place track — card slide-out */
@@ -996,27 +994,22 @@ function renderInboxTracks() {
     const isActive   = state.selected && state.selected.id === t.id ? ' active' : '';
     const extraClass = justPlaced ? ' just-placed' : '';
 
-    // Placed (but not mid-animation): restore row using grid columns
-    if (placed && !justPlaced) {
-      const cells = visibleCols.map(col => {
-        if (col.id === 'name') return '<div class="track-row-name">' + esc(t.name) + ' <span class="inbox-restore-hint">↩ restaurar</span></div>';
-        if (col.id === 'artist') return '<div class="track-row-artist">' + esc(t.artist) + '</div>';
-        return '<div class="track-row-cell"></div>';
-      }).join('');
-      return '<div class="track-row inbox-placed" onclick="unassignTrack(\'' + esc(t.id) + '\')">' + cells + '</div>';
-    }
-
     const cells = visibleCols.map(col => {
       const val = getColValue(t, col.id);
       const cls = col.id === 'name' ? 'track-row-name' : col.id === 'artist' ? 'track-row-artist' : 'track-row-cell';
       return '<div class="' + cls + '">' + esc(val) + '</div>';
     }).join('');
 
-    return '<div class="track-row' + isActive + extraClass + '" onclick="selectInboxTrack(\'' + esc(t.id) + '\')">'
+    const placedCls = placed && !justPlaced ? ' inbox-placed' : '';
+
+    return '<div class="track-row' + isActive + extraClass + placedCls + '" onclick="selectInboxTrack(\'' + esc(t.id) + '\')">'
       + cells
       + (isActive
           ? '<div class="track-row-actions" onclick="event.stopPropagation()">'
-            + '<button class="tr-action-btn del" onclick="rejectInboxTrack(\'' + esc(t.id) + '\')">✕ Rechazar</button>'
+            + '<button class="tr-action-btn" onclick="openDescribeDialog()">Describir</button>'
+            + '<button class="tr-action-btn move" onclick="openMoverDialog()">Mover</button>'
+            + (placed ? '<button class="tr-action-btn" onclick="unassignTrack(\'' + esc(t.id) + '\')">↩ Inbox</button>' : '')
+            + '<button class="tr-action-btn del" onclick="rejectInboxTrack(\'' + esc(t.id) + '\')">✕ No deseados</button>'
             + '</div>'
           : '')
       + '</div>';
@@ -2490,7 +2483,6 @@ async function loadTrackInPlayer(track) {
     nameEl.classList.remove('changing');
     artistEl.classList.remove('changing');
   }, 200);
-  _msSetMetadata(track);
   document.getElementById('player-play-btn').disabled         = true;
   document.getElementById('player-time').textContent          = '—';
 
@@ -2559,7 +2551,6 @@ function startPlayback() {
   playerState.startTime = playerState.audioCtx.currentTime;
   playerState.playing   = true;
   updatePlayBtn();
-  _msSetPlaying(true);
   cancelAnimationFrame(playerState.rafId);
   playerState.rafId = requestAnimationFrame(drawPlayhead);
 }
@@ -2573,7 +2564,6 @@ function stopPlayer() {
   cancelAnimationFrame(playerState.rafId);
   playerState.playing = false;
   updatePlayBtn();
-  _msSetPlaying(false);
 }
 
 function togglePlay() {
@@ -2606,51 +2596,6 @@ document.getElementById('waveform-canvas').addEventListener('click', e => {
   if (wasPlaying) startPlayback();
   else drawPlayhead();
 });
-
-// ---------------------------------------------------------------
-// MEDIA SESSION API — OS media keys (play/pause/next/prev)
-// ---------------------------------------------------------------
-// Chrome/Edge need an active <audio> element to keep the media session alive.
-const _mediaAudio = document.createElement('audio');
-_mediaAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-_mediaAudio.loop = true;
-_mediaAudio.volume = 0;
-
-function _msSetPlaying(playing) {
-  if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
-  if (playing) _mediaAudio.play().catch(() => {});
-  else _mediaAudio.pause();
-}
-
-function _msSetMetadata(track) {
-  if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title:  track.name   || '',
-    artist: track.artist || '',
-    artwork: [{ src: AUDIO_BASE + '/art/' + encodeURIComponent(track.id), sizes: '512x512', type: 'image/jpeg' }]
-  });
-}
-
-function _msNavTrack(dir) {
-  // dir: -1 = prev, +1 = next
-  if (!state.selected) return;
-  const fromPlaylist = state.selectedFrom && state.selectedFrom !== state.inbox;
-  const list = fromPlaylist ? (state.playlistDetailTracks || []) : (state.inboxTracks || []);
-  const idx  = list.findIndex(t => t.id === state.selected.id);
-  const next = list[idx + dir];
-  if (!next) return;
-  if (fromPlaylist) selectTrackFromPlaylist(next.id, state.selectedFrom);
-  else selectTrack(next.id);
-}
-
-if ('mediaSession' in navigator) {
-  navigator.mediaSession.setActionHandler('play',          () => { if (!playerState.playing && playerState.buffer) togglePlay(); });
-  navigator.mediaSession.setActionHandler('pause',         () => { if (playerState.playing) togglePlay(); });
-  navigator.mediaSession.setActionHandler('stop',          () => { if (playerState.playing) togglePlay(); });
-  navigator.mediaSession.setActionHandler('previoustrack', () => _msNavTrack(-1));
-  navigator.mediaSession.setActionHandler('nexttrack',     () => _msNavTrack(+1));
-}
 
 // ---------------------------------------------------------------
 // VOICE RECOGNITION
