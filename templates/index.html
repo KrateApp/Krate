@@ -259,8 +259,8 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 #inbox-drawer-inner{flex:1;display:flex;flex-direction:column;gap:12px;padding-top:8px;min-height:0;overflow:hidden;transform:translateY(16px);opacity:0;transition:transform 360ms cubic-bezier(0.16,1,0.3,1),opacity 280ms ease}
 #inbox-drawer.open #inbox-drawer-inner{transform:translateY(0);opacity:1}
 #inbox-drawer #results-area{flex:1;overflow-y:auto;min-height:0}
-#drawer-toggle-btn{cursor:pointer;color:var(--text-dim);font-size:15px;line-height:1;padding:0 2px;transition:color 0.15s}
-#drawer-toggle-btn:hover{color:var(--text)}
+#drawer-toggle-btn{cursor:pointer;color:var(--accent);font-size:18px;line-height:1;padding:0 4px;transition:opacity 0.15s;opacity:0.8}
+#drawer-toggle-btn:hover{opacity:1}
 .inbox-placed { opacity: 0.3; cursor: pointer; transition: opacity 150ms ease; }
 .inbox-placed:hover { opacity: 0.65; }
 .inbox-restore-hint { color: #3A3830; font-size: 10px; margin-left: 6px; letter-spacing: 0.5px; transition: color 150ms ease; }
@@ -542,6 +542,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
               <button class="voice-lang-btn" data-lang="en-US" onclick="setVoiceLang('en-US','sort')">EN</button>
             </div>
             <button class="btn-primary" id="match-btn" onclick="doMatch()">Coincidir</button>
+            <span id="drawer-toggle-btn" onclick="toggleSuggestionsDrawer()" title="Cerrar">×</span>
             <div class="sort-hint" id="sort-hint">Modo revisión · — playlists activas</div>
           </div>
         </div>
@@ -551,7 +552,6 @@ body{font-family:var(--font-sans,system-ui);margin:0}
           <div id="inbox-drawer-header">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div class="results-label" style="flex:1">SUGERENCIAS</div>
-              <span id="drawer-toggle-btn" onclick="toggleSuggestionsDrawer()" title="Cerrar">×</span>
             </div>
           </div>
           <div id="inbox-drawer-inner">
@@ -2462,6 +2462,7 @@ function drawPlayhead() {
 
 async function loadTrackInPlayer(track) {
   if (!track || !track.id) return;
+  if (playerState.trackId === track.id) return;  // already loaded, don't restart
 
   // Stop current playback
   stopPlayer();
@@ -2489,6 +2490,7 @@ async function loadTrackInPlayer(track) {
     nameEl.classList.remove('changing');
     artistEl.classList.remove('changing');
   }, 200);
+  _msSetMetadata(track);
   document.getElementById('player-play-btn').disabled         = true;
   document.getElementById('player-time').textContent          = '—';
 
@@ -2557,6 +2559,7 @@ function startPlayback() {
   playerState.startTime = playerState.audioCtx.currentTime;
   playerState.playing   = true;
   updatePlayBtn();
+  _msSetPlaying(true);
   cancelAnimationFrame(playerState.rafId);
   playerState.rafId = requestAnimationFrame(drawPlayhead);
 }
@@ -2570,6 +2573,7 @@ function stopPlayer() {
   cancelAnimationFrame(playerState.rafId);
   playerState.playing = false;
   updatePlayBtn();
+  _msSetPlaying(false);
 }
 
 function togglePlay() {
@@ -2602,6 +2606,51 @@ document.getElementById('waveform-canvas').addEventListener('click', e => {
   if (wasPlaying) startPlayback();
   else drawPlayhead();
 });
+
+// ---------------------------------------------------------------
+// MEDIA SESSION API — OS media keys (play/pause/next/prev)
+// ---------------------------------------------------------------
+// Chrome/Edge need an active <audio> element to keep the media session alive.
+const _mediaAudio = document.createElement('audio');
+_mediaAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+_mediaAudio.loop = true;
+_mediaAudio.volume = 0;
+
+function _msSetPlaying(playing) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  if (playing) _mediaAudio.play().catch(() => {});
+  else _mediaAudio.pause();
+}
+
+function _msSetMetadata(track) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title:  track.name   || '',
+    artist: track.artist || '',
+    artwork: [{ src: AUDIO_BASE + '/art/' + encodeURIComponent(track.id), sizes: '512x512', type: 'image/jpeg' }]
+  });
+}
+
+function _msNavTrack(dir) {
+  // dir: -1 = prev, +1 = next
+  if (!state.selected) return;
+  const fromPlaylist = state.selectedFrom && state.selectedFrom !== state.inbox;
+  const list = fromPlaylist ? (state.playlistDetailTracks || []) : (state.inboxTracks || []);
+  const idx  = list.findIndex(t => t.id === state.selected.id);
+  const next = list[idx + dir];
+  if (!next) return;
+  if (fromPlaylist) selectTrackFromPlaylist(next.id, state.selectedFrom);
+  else selectTrack(next.id);
+}
+
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.setActionHandler('play',          () => { if (!playerState.playing && playerState.buffer) togglePlay(); });
+  navigator.mediaSession.setActionHandler('pause',         () => { if (playerState.playing) togglePlay(); });
+  navigator.mediaSession.setActionHandler('stop',          () => { if (playerState.playing) togglePlay(); });
+  navigator.mediaSession.setActionHandler('previoustrack', () => _msNavTrack(-1));
+  navigator.mediaSession.setActionHandler('nexttrack',     () => _msNavTrack(+1));
+}
 
 // ---------------------------------------------------------------
 // VOICE RECOGNITION
