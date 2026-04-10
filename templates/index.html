@@ -1683,6 +1683,8 @@ function closeSuggestionsDrawer() {
 function resetSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
   if (d) d.classList.remove('has-results', 'open');
+  const r = document.getElementById('results-area');
+  if (r) r.innerHTML = '';
 }
 function toggleSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
