@@ -106,6 +106,10 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .result-card.receding-out{animation:krate-recede-out 220ms cubic-bezier(0.4,0,1,1) forwards;pointer-events:none}
 .result-card.entering{opacity:0;animation:krate-slide-in-below 260ms cubic-bezier(0.16,1,0.3,1) forwards}
 .result-card.best.entering{animation:krate-slide-in-below 260ms cubic-bezier(0.16,1,0.3,1) forwards,krate-border-draw 300ms cubic-bezier(0.16,1,0.3,1) forwards}
+.auto-countdown-bar{height:2px;background:#1A1914;border-radius:1px;margin-top:10px;overflow:hidden}
+.auto-countdown-bar-fill{height:100%;background:#FF3D1A;width:100%;transform-origin:left;animation:auto-countdown-drain linear forwards}
+@keyframes auto-countdown-drain{from{width:100%}to{width:0%}}
+.ra-btn.reject{border:1px solid #2A2018;color:#6A4A38;background:transparent}
 
 /* vibe setup panel */
 .vibe-list{display:flex;flex-direction:column;gap:3px}
@@ -702,14 +706,11 @@ body{font-family:var(--font-sans,system-ui);margin:0}
         </div>
         <div style="display:flex;gap:8px">
           <a href="/download/krate_audio.bat" style="flex:1;text-align:center;padding:8px;font-size:10px;letter-spacing:1.5px;color:#C8C4B8;border:1px solid #1A1914;border-radius:2px;text-decoration:none;cursor:pointer">
-            DESCARGAR (WINDOWS)
+            krate_audio.bat
           </a>
           <a href="/download/krate_audio.py" style="flex:1;text-align:center;padding:8px;font-size:10px;letter-spacing:1.5px;color:#6A6858;border:1px solid #1A1914;border-radius:2px;text-decoration:none;cursor:pointer">
-            DESCARGAR (.PY)
+            krate_audio.py
           </a>
-        </div>
-        <div id="audio-server-status" style="font-size:10px;color:#3A3830;margin-top:8px;letter-spacing:0.5px">
-          Verificando servidor de audio...
         </div>
       </div>
 
@@ -775,12 +776,15 @@ const state = {
   selected:             null,
   selectedFrom:         null,   // playlist name the current track came from
   priorSuggestions:     [],     // playlists already suggested for current track (excluded on retry)
+  autoRejected:         [],     // playlists rejected in auto mode countdown (for multi-step fallback)
   session:              {},
   lastPlaced:           null,   // track id of most recently placed track (for flash anim)
   trackDescriptions:    JSON.parse(localStorage.getItem('krate_track_desc') || '{}'), // last description per track id
 };
 
 const AUDIO_BASE = 'http://localhost:5001';
+
+let _autoCountdownTimer = null; // holds setTimeout id for auto-mode auto-place
 
 // ---------------------------------------------------------------
 // HELPERS
@@ -1074,6 +1078,8 @@ function selectInboxTrack(id) {
   if (!t) return;
   if (!state.selected || state.selected.id !== t.id) {
     state.priorSuggestions = [];
+    state.autoRejected = [];
+    clearAutoCountdown();
     resetSuggestionsDrawer();
   }
   state.selected     = t;
@@ -1096,6 +1102,8 @@ function selectTrackById(id) {
   if (!t) return;
   if (!state.selected || state.selected.id !== t.id) {
     state.priorSuggestions = [];
+    state.autoRejected = [];
+    clearAutoCountdown();
     resetSuggestionsDrawer();
   }
   state.selected = t;
@@ -1564,6 +1572,7 @@ function pulsePlaylistTitle(playlist) {
 }
 
 function renderResults(data, entering = false) {
+  clearAutoCountdown();
   let suggestions = [];
 
   if (state.mode === 'auto') {
@@ -1579,19 +1588,31 @@ function renderResults(data, entering = false) {
   }
 
   const enterClass = entering ? ' entering' : '';
+  const isAuto = state.mode === 'auto' && suggestions.length === 1 && !data._autoFallback;
+  const COUNTDOWN_SEC = 5;
 
-  let html = suggestions.map((s, i) =>
-    '<div class="result-card ' + (i === 0 ? 'best' : '') + enterClass + '" id="res-' + i + '">'
-    + '<div class="result-rank ' + (i === 0 ? 'best' : '') + '">0' + (i + 1) + '</div>'
-    + '<div style="flex:1;min-width:0">'
-    + '<div class="result-name' + (i > 0 ? ' dim' : '') + '">' + esc(playlistDisplayName(s.playlist)) + '</div>'
-    + '<div class="result-why">' + esc(s.reason) + '</div>'
-    + '</div>'
-    + '<div class="result-actions">'
-    + '<div class="ra-btn place" onclick="placeTrack(' + i + ',\'' + esc(s.playlist).replace(/'/g,"\\'") + '\')">Colocar aquí</div>'
-    + '<div class="ra-btn skip" onclick="skipResult(' + i + ')">Omitir</div>'
-    + '</div></div>'
-  ).join('');
+  let html = suggestions.map((s, i) => {
+    const safePlaylist = esc(s.playlist).replace(/'/g, "\\'");
+    let cardHtml =
+      '<div class="result-card ' + (i === 0 ? 'best' : '') + enterClass + '" id="res-' + i + '">'
+      + '<div class="result-rank ' + (i === 0 ? 'best' : '') + '">0' + (i + 1) + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="result-name' + (i > 0 ? ' dim' : '') + '">' + esc(playlistDisplayName(s.playlist)) + '</div>'
+      + '<div class="result-why">' + esc(s.reason) + '</div>';
+    if (isAuto && i === 0) {
+      cardHtml += '<div class="auto-countdown-bar"><div class="auto-countdown-bar-fill" id="auto-cd-fill" style="animation-duration:' + COUNTDOWN_SEC + 's"></div></div>';
+    }
+    cardHtml += '</div>'
+      + '<div class="result-actions">'
+      + '<div class="ra-btn place" onclick="confirmAutoPlace(' + i + ',\'' + safePlaylist + '\')">Colocar aquí</div>';
+    if (isAuto && i === 0) {
+      cardHtml += '<div class="ra-btn reject" onclick="rejectAutoSuggestion(\'' + safePlaylist + '\')">Rechazar</div>';
+    } else {
+      cardHtml += '<div class="ra-btn skip" onclick="skipResult(' + i + ')">Omitir</div>';
+    }
+    cardHtml += '</div></div>';
+    return cardHtml;
+  }).join('');
 
   if (data.new_playlist) {
     const np       = data.new_playlist;
@@ -1615,6 +1636,14 @@ function renderResults(data, entering = false) {
   document.querySelectorAll('#results-area .result-card').forEach((card, i) => {
     card.style.animationDelay = entering ? `${i * 80}ms` : `${i * 70}ms`;
   });
+
+  if (isAuto) {
+    const playlist0 = suggestions[0].playlist;
+    _autoCountdownTimer = setTimeout(() => {
+      _autoCountdownTimer = null;
+      placeTrack(0, playlist0);
+    }, COUNTDOWN_SEC * 1000);
+  }
 }
 
 async function placeTrack(idx, playlist) {
@@ -1622,6 +1651,7 @@ async function placeTrack(idx, playlist) {
     showToast('Selecciona una pista primero');
     return;
   }
+  clearAutoCountdown();
 
   const card = document.getElementById('res-' + idx);
   if (card) card.classList.add('done');
@@ -1654,8 +1684,9 @@ async function placeTrack(idx, playlist) {
     document.getElementById('sort-textarea').value = '';
     document.getElementById('results-area').innerHTML =
       '<div class="no-match"><p>Selecciona una pista y presiona Coincidir.</p></div>';
-    state.lastPlaced = state.selected.id;
-    state.selected   = null;
+    state.lastPlaced   = state.selected.id;
+    state.selected     = null;
+    state.autoRejected = [];
 
     pulsePlaylistTitle(playlist);
     const chip = document.getElementById('selected-chip');
@@ -1705,6 +1736,60 @@ function toggleSuggestionsDrawer() {
 function skipResult(idx) {
   const card = document.getElementById('res-' + idx);
   if (card) card.remove();
+}
+
+function clearAutoCountdown() {
+  if (_autoCountdownTimer !== null) {
+    clearTimeout(_autoCountdownTimer);
+    _autoCountdownTimer = null;
+  }
+}
+
+function confirmAutoPlace(idx, playlist) {
+  clearAutoCountdown();
+  placeTrack(idx, playlist);
+}
+
+async function rejectAutoSuggestion(playlist) {
+  clearAutoCountdown();
+  const card = document.getElementById('res-0');
+  if (card) card.classList.add('done');
+
+  state.autoRejected.push(playlist);
+  state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), playlist])];
+
+  const desc = document.getElementById('sort-textarea').value.trim();
+  if (!desc) return;
+
+  const resultsArea = document.getElementById('results-area');
+
+  // After 2 rejections fall back to review mode with remaining suggestions
+  const fallbackToReview = state.autoRejected.length >= 2;
+  const matchMode = fallbackToReview ? 'review' : 'auto';
+
+  resultsArea.innerHTML =
+    '<div class="matching-state">BUSCANDO<span class="krate-dots"><span>·</span><span>·</span><span>·</span></span></div>';
+
+  try {
+    const res  = await fetch('/api/match', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({description: desc, mode: matchMode, excluded_playlists: state.priorSuggestions})
+    });
+    const data = await res.json();
+    if (data.error) {
+      resultsArea.innerHTML = '<div class="err-state">' + esc(data.message || data.error) + '</div>';
+      return;
+    }
+    const newSuggestions = matchMode === 'auto'
+      ? (data.playlist ? [data.playlist] : [])
+      : (data.suggestions || []).map(s => s.playlist);
+    state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), ...newSuggestions])];
+    if (fallbackToReview) data._autoFallback = true;
+    renderResults(data, true);
+  } catch(e) {
+    resultsArea.innerHTML = '<div class="err-state">' + esc(e.message) + '</div>';
+  }
 }
 
 // Enter to match, Shift+Enter for new line
@@ -2169,6 +2254,7 @@ async function doDialogMatch() {
 }
 
 function renderDialogResults(data) {
+  clearAutoCountdown();
   let suggestions = [];
   if (state.mode === 'auto') {
     if (data.playlist) suggestions = [{playlist: data.playlist, reason: data.reason}];
@@ -2182,18 +2268,31 @@ function renderDialogResults(data) {
     return;
   }
 
-  let html = suggestions.map((s, i) =>
-    '<div class="result-card ' + (i === 0 ? 'best' : '') + '" id="dres-' + i + '">'
-    + '<div class="result-rank ' + (i === 0 ? 'best' : '') + '">0' + (i + 1) + '</div>'
-    + '<div style="flex:1;min-width:0">'
-    + '<div class="result-name' + (i > 0 ? ' dim' : '') + '">' + esc(playlistDisplayName(s.playlist)) + '</div>'
-    + '<div class="result-why">' + esc(s.reason) + '</div>'
-    + '</div>'
-    + '<div class="result-actions">'
-    + '<div class="ra-btn place" onclick="placeFromDialog(' + i + ',\'' + esc(s.playlist).replace(/'/g, "\\'") + '\')">Colocar aquí</div>'
-    + '<div class="ra-btn skip" onclick="document.getElementById(\'dres-' + i + '\').remove()">Omitir</div>'
-    + '</div></div>'
-  ).join('');
+  const isAuto = state.mode === 'auto' && suggestions.length === 1 && !data._autoFallback;
+  const COUNTDOWN_SEC = 5;
+
+  let html = suggestions.map((s, i) => {
+    const safePlaylist = esc(s.playlist).replace(/'/g, "\\'");
+    let cardHtml =
+      '<div class="result-card ' + (i === 0 ? 'best' : '') + '" id="dres-' + i + '">'
+      + '<div class="result-rank ' + (i === 0 ? 'best' : '') + '">0' + (i + 1) + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="result-name' + (i > 0 ? ' dim' : '') + '">' + esc(playlistDisplayName(s.playlist)) + '</div>'
+      + '<div class="result-why">' + esc(s.reason) + '</div>';
+    if (isAuto && i === 0) {
+      cardHtml += '<div class="auto-countdown-bar"><div class="auto-countdown-bar-fill" id="auto-cd-fill-d" style="animation-duration:' + COUNTDOWN_SEC + 's"></div></div>';
+    }
+    cardHtml += '</div>'
+      + '<div class="result-actions">'
+      + '<div class="ra-btn place" onclick="confirmDialogPlace(' + i + ',\'' + safePlaylist + '\')">Colocar aquí</div>';
+    if (isAuto && i === 0) {
+      cardHtml += '<div class="ra-btn reject" onclick="rejectDialogAutoSuggestion(\'' + safePlaylist + '\')">Rechazar</div>';
+    } else {
+      cardHtml += '<div class="ra-btn skip" onclick="document.getElementById(\'dres-' + i + '\').remove()">Omitir</div>';
+    }
+    cardHtml += '</div></div>';
+    return cardHtml;
+  }).join('');
 
   if (data.new_playlist) {
     const np       = data.new_playlist;
@@ -2217,10 +2316,64 @@ function renderDialogResults(data) {
   document.querySelectorAll('#dialog-results-area .result-card').forEach((card, i) => {
     card.style.animationDelay = `${i * 70}ms`;
   });
+
+  if (isAuto) {
+    const playlist0 = suggestions[0].playlist;
+    _autoCountdownTimer = setTimeout(() => {
+      _autoCountdownTimer = null;
+      placeFromDialog(0, playlist0);
+    }, COUNTDOWN_SEC * 1000);
+  }
+}
+
+function confirmDialogPlace(idx, playlist) {
+  clearAutoCountdown();
+  placeFromDialog(idx, playlist);
+}
+
+async function rejectDialogAutoSuggestion(playlist) {
+  clearAutoCountdown();
+  const card = document.getElementById('dres-0');
+  if (card) card.classList.add('done');
+
+  state.autoRejected.push(playlist);
+  state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), playlist])];
+
+  const desc = document.getElementById('dialog-textarea').value.trim();
+  if (!desc) return;
+
+  const resultsArea = document.getElementById('dialog-results-area');
+  const fallbackToReview = state.autoRejected.length >= 2;
+  const matchMode = fallbackToReview ? 'review' : 'auto';
+
+  resultsArea.innerHTML =
+    '<div class="matching-state">BUSCANDO<span class="krate-dots"><span>·</span><span>·</span><span>·</span></span></div>';
+
+  try {
+    const res  = await fetch('/api/match', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({description: desc, mode: matchMode, excluded_playlists: state.priorSuggestions})
+    });
+    const data = await res.json();
+    if (data.error) {
+      resultsArea.innerHTML = '<div class="err-state">' + esc(data.message || data.error) + '</div>';
+      return;
+    }
+    const newSuggestions = matchMode === 'auto'
+      ? (data.playlist ? [data.playlist] : [])
+      : (data.suggestions || []).map(s => s.playlist);
+    state.priorSuggestions = [...new Set([...(state.priorSuggestions || []), ...newSuggestions])];
+    if (fallbackToReview) data._autoFallback = true;
+    renderDialogResults(data);
+  } catch(e) {
+    resultsArea.innerHTML = '<div class="err-state">' + esc(e.message) + '</div>';
+  }
 }
 
 async function placeFromDialog(idx, playlist) {
   if (!state.selected) { showToast('Selecciona una pista primero'); return; }
+  clearAutoCountdown();
 
   if (idx >= 0) {
     const card = document.getElementById('dres-' + idx);
@@ -2247,7 +2400,8 @@ async function placeFromDialog(idx, playlist) {
       artist:          state.selected.artist,
       source_playlist: state.selectedFrom || null,
     };
-    state.selected = null;
+    state.selected     = null;
+    state.autoRejected = [];
     renderSessionPanel();
     showToast('→ ' + playlistDisplayName(playlist));
     document.getElementById('dialog-textarea').value = '';
@@ -2813,22 +2967,6 @@ function startupHandleVibes(input) {
   document.getElementById('startup-vibes-zone').classList.add('has-file');
 }
 
-async function checkAudioServer() {
-  const el = document.getElementById('audio-server-status');
-  try {
-    const res = await fetch('http://localhost:5001/ping', { signal: AbortSignal.timeout(2000) });
-    if (res.ok) {
-      el.style.color = '#4A7A4A';
-      el.textContent = '✓ Servidor de audio activo — el audio funcionará correctamente';
-      return;
-    }
-  } catch(_) {}
-  el.style.color = '#6A6858';
-  el.textContent = 'Servidor no detectado — descarga y ejecuta el archivo de arriba para reproducir audio';
-}
-
-// Verificar servidor al abrir la página
-checkAudioServer();
 
 async function startupSubmit() {
   if (!_startupXmlFile) return;
