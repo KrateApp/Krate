@@ -105,7 +105,7 @@ TRACK DESCRIPTION:
 PLAYLISTS AND THEIR VIBES:
 {playlist_block}
 
-Suggest the 2–3 best fits. Be honest — if only one actually works, give one.
+Suggest up to 5 best fits. Be honest — if only one or two actually work, give those.
 If nothing fits, say so with a brief reason.
 
 If the track truly doesn't fit any existing playlist well, you may suggest creating a new one by including a "new_playlist" field.
@@ -114,6 +114,7 @@ Only include "new_playlist" if genuinely warranted — omit it entirely when exi
 Respond with JSON only — no markdown, no explanation outside the JSON:
 {{
   "suggestions": [
+    {{"playlist": "exact playlist name", "reason": "one punchy sentence"}},
     {{"playlist": "exact playlist name", "reason": "one punchy sentence"}},
     {{"playlist": "exact playlist name", "reason": "one punchy sentence"}}
   ],
@@ -124,7 +125,7 @@ Omit "new_playlist" entirely if existing playlists cover this track well."""
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=900,
+        max_tokens=1200,
         messages=[{"role": "user", "content": prompt}]
     )
 
