@@ -2,6 +2,15 @@ import xml.etree.ElementTree as ET
 import anthropic
 import json
 import os
+import re
+
+def _strip_json_fences(raw: str) -> str:
+    """Quita fences de markdown (```json ... ```) de forma robusta."""
+    raw = raw.strip()
+    raw = re.sub(r'^```(?:json)?\s*\n?', '', raw)
+    raw = re.sub(r'\n?```\s*$', '', raw)
+    return raw.strip()
+
 
 # ---------------------------------------------------------------
 # CONFIG
@@ -129,15 +138,7 @@ Omit "new_playlist" entirely if existing playlists cover this track well."""
         messages=[{"role": "user", "content": prompt}]
     )
 
-    raw = message.content[0].text.strip()
-
-    # Strip accidental markdown fences if the model adds them
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
-
+    raw = _strip_json_fences(message.content[0].text)
     return json.loads(raw)
 
 
@@ -164,12 +165,7 @@ Respond with JSON only — no markdown, no explanation:
         max_tokens=200,
         messages=[{"role": "user", "content": prompt}]
     )
-    raw = message.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+    raw = _strip_json_fences(message.content[0].text)
     return json.loads(raw)
 
 
@@ -218,12 +214,7 @@ Respond with JSON only — no markdown, no explanation outside the JSON."""
         messages=messages,
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+    raw = _strip_json_fences(response.content[0].text)
     return json.loads(raw)
 
 

@@ -264,7 +264,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 #inbox-drawer-inner{flex:1;display:flex;flex-direction:column;gap:12px;padding-top:8px;min-height:0;overflow:hidden;transform:translateY(16px);opacity:0;transition:transform 360ms cubic-bezier(0.16,1,0.3,1),opacity 280ms ease}
 #inbox-drawer.open #inbox-drawer-inner{transform:translateY(0);opacity:1}
 #inbox-drawer #results-area{flex:1;overflow-y:auto;min-height:0}
-#drawer-toggle-btn{cursor:pointer;color:var(--accent);font-size:18px;line-height:1;padding:0 4px;transition:opacity 0.15s;opacity:0.8}
+#drawer-toggle-btn{cursor:pointer;color:#FF3D1A;font-size:18px;line-height:1;padding:0 4px;transition:opacity 0.15s;opacity:0.8}
 #drawer-toggle-btn:hover{opacity:1}
 .inbox-placed { opacity: 0.3; cursor: pointer; transition: opacity 150ms ease; }
 .inbox-placed:hover { opacity: 0.65; }
@@ -1217,6 +1217,12 @@ function renderPlaylistsPanel() {
     + '</div>'
     + '<div id="create-form-slot"></div>'
     + activeHtml + '</div>';
+
+  // Restaurar focus al input de búsqueda si hay texto (el rebuild destruye el DOM node)
+  if (_playlistsSearch) {
+    const _ps = document.getElementById('playlists-search');
+    if (_ps) { _ps.focus(); _ps.setSelectionRange(_ps.value.length, _ps.value.length); }
+  }
 
   document.getElementById('playlists-hidden-section').innerHTML = hidden.length
     ? '<div class="pl-mgmt-section">'
@@ -2275,7 +2281,8 @@ function openDescribeDialog() {
 function openMoverDialog() {
   document.getElementById('dialog-title').textContent = 'MOVER A PLAYLIST';
   document.getElementById('dialog-describe-section').style.display = 'none';
-  const playlists = state.playlists.filter(p => !p.hidden);
+  const playlists = [...state.playlists.filter(p => !p.hidden)]
+    .sort((a, b) => playlistDisplayName(a.name).localeCompare(playlistDisplayName(b.name)));
   const html = playlists.map((p, i) =>
     '<div class="result-card" id="dres-' + i + '">'
     + '<div style="flex:1;min-width:0"><div class="result-name">' + esc(playlistDisplayName(p.name)) + '</div>'
@@ -2493,6 +2500,7 @@ async function placeFromDialog(idx, playlist) {
     document.getElementById('dialog-textarea').value = '';
     document.getElementById('sort-textarea').value = '';
     closeActionDialog();
+    closeSuggestionsDrawer();
     pulsePlaylistTitle(playlist);
 
     if (state.selectedFrom === state.inbox) {
@@ -2768,7 +2776,12 @@ async function loadTrackInPlayer(track) {
   }
 
   try {
-    const res  = await fetch(AUDIO_BASE + '/audio/' + encodeURIComponent(track.id));
+    // Los tracks asignados en sesión no están en el XML del servidor de audio local.
+    // Usamos /audio-by-path con la location guardada en session_assignments.
+    const audioUrl = (track.session_new && track.location)
+      ? AUDIO_BASE + '/audio-by-path?path=' + encodeURIComponent(track.location)
+      : AUDIO_BASE + '/audio/' + encodeURIComponent(track.id);
+    const res  = await fetch(audioUrl);
     if (!res.ok) throw new Error('No se pudo cargar el audio');
     const buf  = await res.arrayBuffer();
     const decoded = await playerState.audioCtx.decodeAudioData(buf);

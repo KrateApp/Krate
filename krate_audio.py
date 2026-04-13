@@ -7,7 +7,7 @@ Solo necesitas tenerlo corriendo mientras usas Krate.
 import os
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
-from flask import Flask, send_file, Response
+from flask import Flask, send_file, Response, request as flask_request
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -96,6 +96,29 @@ def serve_art(track_id):
     except Exception:
         pass
     return ("", 404)
+
+
+@app.route("/audio-by-path")
+def serve_audio_by_path():
+    """Sirve un archivo de audio dado su location (path o URL file://) directamente.
+    Usado para tracks asignados en sesión que aún no están en el XML exportado."""
+    raw_path = flask_request.args.get("path", "")
+    if not raw_path:
+        return ("Sin ruta", 400)
+    path = location_to_path(raw_path)
+    if not path or not os.path.exists(path):
+        return ("Archivo no encontrado", 404)
+    ext  = os.path.splitext(path)[1].lower()
+    mime = {
+        ".mp3":  "audio/mpeg",
+        ".flac": "audio/flac",
+        ".wav":  "audio/wav",
+        ".aiff": "audio/aiff",
+        ".aif":  "audio/aiff",
+        ".m4a":  "audio/mp4",
+        ".ogg":  "audio/ogg",
+    }.get(ext, "audio/mpeg")
+    return send_file(path, mimetype=mime, conditional=True)
 
 
 @app.route("/ping")
