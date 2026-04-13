@@ -264,7 +264,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 #inbox-drawer-inner{flex:1;display:flex;flex-direction:column;gap:12px;padding-top:8px;min-height:0;overflow:hidden;transform:translateY(16px);opacity:0;transition:transform 360ms cubic-bezier(0.16,1,0.3,1),opacity 280ms ease}
 #inbox-drawer.open #inbox-drawer-inner{transform:translateY(0);opacity:1}
 #inbox-drawer #results-area{flex:1;overflow-y:auto;min-height:0}
-#drawer-toggle-btn{cursor:pointer;color:#FF3D1A;font-size:18px;line-height:1;padding:0 4px;transition:opacity 0.15s;opacity:0.8}
+#drawer-toggle-btn{cursor:pointer;color:#FF3D1A;font-size:18px;line-height:1;padding:0 4px;transition:opacity 0.15s;opacity:0.8;display:none}
 #drawer-toggle-btn:hover{opacity:1}
 .inbox-placed { opacity: 0.3; cursor: pointer; transition: opacity 150ms ease; }
 .inbox-placed:hover { opacity: 0.65; }
@@ -507,6 +507,7 @@ body{font-family:var(--font-sans,system-ui);margin:0}
     </div>
 
     <div class="sidebar-section" style="margin-top:8px">PLAYLISTS</div>
+    <div id="sidebar-sort-bar" style="padding:3px 8px 4px;display:flex;gap:3px;border-bottom:1px solid #1A1914;flex-shrink:0"></div>
     <div id="sidebar-playlists"></div>
 
     <div class="sidebar-footer">
@@ -1097,23 +1098,90 @@ function renderTopbar() {
 let _sidebarFilledDots = new Set();
 let _playlistsSearch   = '';
 let _playlistsSortAlpha = true;
+let _sidebarSortMode   = 'custom'; // 'alpha' | 'recent' | 'custom'
+let _sidebarDragName   = null;
 
 function renderSidebar() {
   const active = state.playlists.filter(p => !p.hidden);
-  const html = active.map(p => {
-    const hasVibe   = p.vibe && p.vibe.trim();
+
+  // Apply sort
+  let sorted = active.slice();
+  if (_sidebarSortMode === 'alpha') {
+    sorted.sort((a, b) => playlistDisplayName(a.name).localeCompare(playlistDisplayName(b.name)));
+  } else if (_sidebarSortMode === 'recent') {
+    const touched = new Set(Object.values(state.session || {}).map(s => s.playlist));
+    sorted.sort((a, b) => {
+      const aT = touched.has(a.name) ? 0 : 1;
+      const bT = touched.has(b.name) ? 0 : 1;
+      return aT - bT || playlistDisplayName(a.name).localeCompare(playlistDisplayName(b.name));
+    });
+  }
+  // 'custom': uses state.playlists order as-is
+
+  const html = sorted.map(p => {
+    const hasVibe    = p.vibe && p.vibe.trim();
     const justFilled = hasVibe && !_sidebarFilledDots.has(p.name);
-    return '<div class="pl-item" onclick="openPlaylist(\'' + esc(p.name).replace(/'/g, "\\'") + '\')">'
+    const safeName   = esc(p.name).replace(/'/g, "\\'");
+    const dragAttrs  = _sidebarSortMode === 'custom'
+      ? ' draggable="true" ondragstart="_sidebarDragStart(event,\'' + safeName + '\')" ondragover="_sidebarDragOver(event)" ondrop="_sidebarDrop(event,\'' + safeName + '\')"'
+      : '';
+    return '<div class="pl-item"' + dragAttrs + ' onclick="openPlaylist(\'' + safeName + '\')">'
       + '<div class="dot ' + (hasVibe ? 'filled' + (justFilled ? ' pulse' : '') : 'empty') + '"></div>'
       + '<span class="pl-name" style="' + (hasVibe ? 'color:#6A6858' : 'color:#2A2A22') + '">' + esc(playlistDisplayName(p.name)) + '</span>'
       + '<span class="pl-count">' + (p.count || '') + '</span>'
       + '</div>';
   }).join('');
+
   _sidebarFilledDots = new Set(active.filter(p => p.vibe && p.vibe.trim()).map(p => p.name));
   document.getElementById('sidebar-playlists').innerHTML = html;
 
+  // Sort bar
+  const sortBar = document.getElementById('sidebar-sort-bar');
+  if (sortBar) {
+    sortBar.innerHTML = ['alpha', 'recent', 'custom'].map(m =>
+      '<button onclick="_setSidebarSort(\'' + m + '\')" style="font-size:9px;letter-spacing:1px;padding:2px 6px;border-radius:2px;cursor:pointer;border:1px solid '
+      + (_sidebarSortMode === m ? '#FF3D1A' : '#1A1914') + ';color:'
+      + (_sidebarSortMode === m ? '#FF3D1A' : '#6A6858') + ';background:transparent">'
+      + {alpha: 'A–Z', recent: 'Recientes', custom: 'Mi orden'}[m]
+      + '</button>'
+    ).join('');
+  }
+
   document.getElementById('sidebar-footer-content').innerHTML =
     '<div class="sidebar-footer-stat" style="color:#FF3D1A;opacity:0.4">v0.4 · Fase 3</div>';
+}
+
+function _setSidebarSort(mode) {
+  _sidebarSortMode = mode;
+  renderSidebar();
+}
+
+function _sidebarDragStart(e, name) {
+  _sidebarDragName = name;
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function _sidebarDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function _sidebarDrop(e, targetName) {
+  e.preventDefault();
+  if (!_sidebarDragName || _sidebarDragName === targetName) return;
+  const allNames = state.playlists.map(p => p.name);
+  const fi = allNames.indexOf(_sidebarDragName);
+  const ti = allNames.indexOf(targetName);
+  if (fi < 0 || ti < 0) return;
+  const [item] = state.playlists.splice(fi, 1);
+  state.playlists.splice(ti, 0, item);
+  _sidebarDragName = null;
+  renderSidebar();
+  fetch('/api/playlists/reorder', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({order: state.playlists.map(p => p.name)})
+  });
 }
 
 function selectInboxTrack(id) {
@@ -1795,7 +1863,7 @@ function openSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
   if (d) { d.classList.add('has-results', 'open'); }
   const btn = document.getElementById('drawer-toggle-btn');
-  if (btn) { btn.textContent = '×'; btn.title = 'Cerrar'; }
+  if (btn) { btn.style.display = ''; btn.textContent = '×'; btn.title = 'Cerrar'; }
   // Pre-populate textarea with prior description if available
   const ta = document.getElementById('sort-textarea');
   if (ta && state.selected && state.trackDescriptions[state.selected.id]) {
@@ -1813,6 +1881,8 @@ function resetSuggestionsDrawer() {
   if (d) d.classList.remove('has-results', 'open');
   const r = document.getElementById('results-area');
   if (r) r.innerHTML = '';
+  const btn = document.getElementById('drawer-toggle-btn');
+  if (btn) btn.style.display = 'none';
 }
 function toggleSuggestionsDrawer() {
   const d = document.getElementById('inbox-drawer');
@@ -2209,7 +2279,7 @@ function renderPlaylistDetailTracks(name) {
   const safePlaylist = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const html = tracks.map(t => {
-    const placed     = !!state.session[t.id];
+    const placed     = state.session[t.id] && state.session[t.id].playlist !== name;
     const isSelected = state.selected && state.selected.id === t.id;
     const isNew      = !!t.session_new;
     const active     = isSelected ? ' active' : '';
@@ -2278,21 +2348,34 @@ function openDescribeDialog() {
   setTimeout(() => document.getElementById('dialog-textarea').focus(), 50);
 }
 
+let _moverPlaylists = [];
+
 function openMoverDialog() {
   document.getElementById('dialog-title').textContent = 'MOVER A PLAYLIST';
   document.getElementById('dialog-describe-section').style.display = 'none';
-  const playlists = [...state.playlists.filter(p => !p.hidden)]
+  _moverPlaylists = [...state.playlists.filter(p => !p.hidden)]
     .sort((a, b) => playlistDisplayName(a.name).localeCompare(playlistDisplayName(b.name)));
-  const html = playlists.map((p, i) =>
+  document.getElementById('dialog-results-area').innerHTML =
+    '<input class="track-search" id="mover-search" placeholder="Buscar playlist..." '
+    + 'oninput="_renderMoverList(this.value)" style="border-bottom:1px solid #1A1914;margin-bottom:4px">'
+    + '<div id="mover-list"></div>';
+  _renderMoverList('');
+  document.getElementById('action-dialog').classList.add('open');
+  setTimeout(() => { const s = document.getElementById('mover-search'); if (s) s.focus(); }, 50);
+}
+
+function _renderMoverList(q) {
+  const lq = (q || '').toLowerCase();
+  const filtered = _moverPlaylists.filter(p => !lq || playlistDisplayName(p.name).toLowerCase().includes(lq));
+  const html = filtered.map((p, i) =>
     '<div class="result-card" id="dres-' + i + '">'
     + '<div style="flex:1;min-width:0"><div class="result-name">' + esc(playlistDisplayName(p.name)) + '</div>'
     + (p.vibe ? '<div class="result-why">' + esc(p.vibe) + '</div>' : '') + '</div>'
     + '<div class="result-actions"><div class="ra-btn place" onclick="placeFromDialog(-1,\'' + esc(p.name).replace(/'/g, "\\'") + '\')">Colocar aquí</div></div>'
     + '</div>'
   ).join('');
-  document.getElementById('dialog-results-area').innerHTML =
-    html || '<div class="no-match"><p>No hay playlists disponibles.</p></div>';
-  document.getElementById('action-dialog').classList.add('open');
+  document.getElementById('mover-list').innerHTML =
+    html || '<div class="no-match"><p>Sin resultados.</p></div>';
 }
 
 function closeActionDialog() {
@@ -3327,7 +3410,7 @@ async function runOverlapAnalysis(userMessage) {
     const data = await res.json();
     if (data.error) throw new Error(data.message || data.error);
 
-    _overlapConversation.push({ role: 'assistant', content: JSON.stringify(data) });
+    _overlapConversation.push({ role: 'assistant', content: data.follow_up || '' });
     _renderOverlapAiResponse(data);
   } catch(e) {
     statusEl.textContent = 'Error: ' + e.message;
