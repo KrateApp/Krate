@@ -810,6 +810,27 @@ def get_vibes():
     return jsonify(load_vibes())
 
 
+@app.route("/api/vibes/generate", methods=["POST"])
+def generate_vibe_route():
+    from krate import generate_vibe
+    data         = request.get_json()
+    name         = (data.get("name") or "").strip()
+    answers      = data.get("answers") or {}
+    current_vibe = (data.get("current_vibe") or "").strip() or None
+    if not answers.get("moment") and not answers.get("energy"):
+        return jsonify({"error": "Se requieren al menos momento y energía"}), 400
+    try:
+        result = generate_vibe(name, answers, current_vibe=current_vibe)
+        return jsonify(result)
+    except Exception as e:
+        import anthropic
+        if isinstance(e, anthropic.AuthenticationError):
+            return jsonify({"error": "API key inválida."}), 500
+        if isinstance(e, anthropic.APIStatusError) and e.status_code == 529:
+            return jsonify({"error": "overloaded", "message": "La API de Anthropic está saturada."}), 529
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/vibes/export")
 def export_vibes():
     vibes = load_vibes()

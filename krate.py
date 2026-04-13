@@ -171,6 +171,45 @@ Respond with JSON only — no markdown, no explanation:
 
 
 
+def generate_vibe(playlist_name: str, answers: dict, current_vibe: str = None) -> dict:
+    """
+    Genera o refina una descripción de vibe para una playlist basándose en
+    respuestas guiadas del usuario.
+    answers: {moment: str, energy: str, keyword: str}
+    Returns: {"name": str, "vibe": str}
+    """
+    moment  = answers.get('moment', '')
+    energy  = answers.get('energy', '')
+    keyword = answers.get('keyword', '').strip()
+
+    refine_block = ""
+    if current_vibe:
+        refine_block = f"\nDESCRIPCIÓN ACTUAL (mejorar o redefinir según las respuestas):\n{current_vibe}\n"
+
+    keyword_block = f"\nPalabra clave del usuario: {keyword}" if keyword else ""
+
+    prompt = f"""Eres Krate, un asistente para DJs que ayuda a definir el vibe de sus playlists.
+El DJ respondió estas preguntas sobre su playlist "{playlist_name}":{refine_block}
+
+- Momento del set: {moment}
+- Energía / atmósfera: {energy}{keyword_block}
+
+Con esa información, escribe un nombre corto y una descripción de vibe de una oración.
+El vibe debe describir la energía, el mood y el contexto para el que un DJ usaría esta playlist.
+Escribe el vibe en español, a menos que la palabra clave esté en inglés — en ese caso usa inglés.
+
+Responde solo con JSON, sin markdown ni explicaciones:
+{{"name": "Nombre corto", "vibe": "Una oración que describa el vibe"}}"""
+
+    message = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = _strip_json_fences(message.content[0].text)
+    return json.loads(raw)
+
+
 # ---------------------------------------------------------------
 # SETUP MODE  — write vibe descriptions for your playlists
 # ---------------------------------------------------------------
