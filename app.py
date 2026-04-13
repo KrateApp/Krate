@@ -241,6 +241,23 @@ def do_match():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/analyze-overlap", methods=["POST"])
+def analyze_overlap_route():
+    from krate import analyze_overlap
+    data         = request.get_json()
+    playlists    = data.get("playlists", [])
+    conversation = data.get("conversation", [])
+    if not playlists:
+        return jsonify({"error": "No playlists provided"}), 400
+    try:
+        return jsonify(analyze_overlap(playlists, conversation))
+    except Exception as e:
+        import anthropic as _anthropic
+        if isinstance(e, _anthropic.APIStatusError) and e.status_code == 529:
+            return jsonify({"error": "overloaded", "message": "La API está saturada. Intenta de nuevo."}), 529
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/playlists/reorder", methods=["POST"])
 def reorder_playlists():
     order = request.get_json().get("order", [])
@@ -394,7 +411,7 @@ def get_playlist_tracks(name):
                         "bpm":      info.get("bpm", ""),
                         "key":      info.get("key", ""),
                         "album":    "", "year": "", "duration": "",
-                        "genre":    "", "location": "",
+                        "genre":    "", "location": info.get("location", ""),
                     }
                     for tid, info in session_assignments.items()
                     if info.get("playlist") == name
@@ -420,7 +437,7 @@ def get_playlist_tracks(name):
                     "bpm":          info.get("bpm", ""),
                     "key":          info.get("key", ""),
                     "album":        "", "year": "", "duration": "",
-                    "genre":        "", "location": "",
+                    "genre":        "", "location": info.get("location", ""),
                     "session_new":  True,
                 })
 
@@ -515,6 +532,7 @@ def assign_track():
         "artist":          data.get("artist", ""),
         "bpm":             data.get("bpm", ""),
         "key":             data.get("key", ""),
+        "location":        data.get("location", ""),
         "source_playlist": data.get("source_playlist"),
     }
     if playlist:

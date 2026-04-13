@@ -174,6 +174,60 @@ Respond with JSON only — no markdown, no explanation:
 
 
 # ---------------------------------------------------------------
+# OVERLAP ANALYSIS
+# ---------------------------------------------------------------
+
+def analyze_overlap(playlists_with_vibes: list, conversation_history: list) -> dict:
+    """
+    Analyzes playlist vibes for overlaps and asks clarifying questions.
+    playlists_with_vibes: [{"name": str, "vibe": str}, ...]
+    conversation_history: [{"role": "user"|"assistant", "content": str}, ...]
+    Returns: {"overlaps": [...], "questions": [...], "follow_up": str}
+    """
+    playlist_block = "\n".join(
+        f'- "{p["name"]}": {p["vibe"]}'
+        for p in playlists_with_vibes
+        if p.get("vibe", "").strip()
+    )
+
+    system_prompt = """You are Krate, a DJ playlist assistant specializing in vibe analysis.
+Your task is to identify which playlists have overlapping vibes — where a track could reasonably fit into both.
+Be specific and honest. Ask 1-3 clarifying questions when you need more context to refine the analysis.
+Always respond in the same language the user writes in (if there is no user message yet, use Spanish).
+Respond with JSON only — no markdown, no explanation outside the JSON."""
+
+    if not conversation_history:
+        user_content = (
+            f"Aquí están mis playlists y sus vibes:\n\n{playlist_block}\n\n"
+            "Analiza qué playlists tienen vibes que se solapan — donde un track podría encajar en ambas. "
+            "Para cada overlap, explica por qué un track podría pertenecer a las dos. "
+            "Luego haz 1-3 preguntas para refinar el análisis si es necesario.\n\n"
+            'Responde con JSON:\n'
+            '{"overlaps":[{"playlists":["nombre1","nombre2"],"reason":"por qué se solapan"}],'
+            '"questions":["pregunta 1"],'
+            '"follow_up":"resumen breve de lo que encontraste"}'
+        )
+        messages = [{"role": "user", "content": user_content}]
+    else:
+        messages = conversation_history.copy()
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        system=system_prompt,
+        messages=messages,
+    )
+
+    raw = response.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    return json.loads(raw)
+
+
+# ---------------------------------------------------------------
 # SETUP MODE  — write vibe descriptions for your playlists
 # ---------------------------------------------------------------
 

@@ -449,6 +449,27 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .vibes-empty{font-size:11px;color:#3A3830;font-style:italic;padding:8px 0}
 @keyframes krate-player-in{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
 .player-bar.has-track{animation:krate-player-in 300ms cubic-bezier(0.16,1,0.3,1) forwards}
+#playlist-detail-name{font-size:15px;color:#C8C4B8;letter-spacing:1px}
+#playlist-detail-vibe{font-size:11px;color:#6A6858;line-height:1.5;margin-top:2px;max-width:520px;padding-bottom:4px}
+.overlap-chat{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow-y:auto;padding-right:4px}
+.overlap-msg{padding:10px 12px;border-radius:4px;font-size:11px;line-height:1.6}
+.overlap-msg.ai{background:#060605;border:1px solid #1A1914;color:#9A9880}
+.overlap-msg.user{background:#0E0D0B;border:1px solid #2A2018;color:#C8C4B8;text-align:right}
+.overlap-pair{background:#0A0908;border:1px solid #1A1914;border-radius:3px;padding:8px 10px;margin-bottom:4px}
+.overlap-pair-names{font-size:11px;color:#FF3D1A;margin-bottom:3px}
+.overlap-pair-reason{font-size:11px;color:#6A6858;line-height:1.4}
+.overlap-q{font-size:11px;color:#C8C4B8;padding:6px 0;border-bottom:1px solid #0E0E0A;cursor:pointer;transition:color .1s}
+.overlap-q:last-child{border-bottom:none}
+.overlap-q:hover{color:#FF3D1A}
+.overlap-input{flex:1;background:#0A0908;border:1px solid #1A1914;border-radius:3px;padding:7px 10px;color:#C8C4B8;font-size:12px;outline:none;font-family:inherit;resize:none}
+.overlap-input:focus{border-color:#333}
+#export-overlay{position:fixed;inset:0;z-index:500;background:rgba(5,5,4,0.72);display:none;pointer-events:all}
+#export-overlay.visible{display:block}
+#export-overlay.fading{opacity:0;transition:opacity 300ms ease}
+#export-bar-wrap{position:fixed;bottom:0;left:0;right:0;height:3px;z-index:501;pointer-events:none}
+#export-bar{height:100%;width:0%;background:#FF3D1A;transition:width 3s cubic-bezier(0.1,0,0.4,1)}
+#export-bar.running{width:95%}
+#export-bar.done{width:100%;transition:width 200ms ease}
 </style>
 </head>
 <body>
@@ -594,10 +615,13 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 
     <!-- PLAYLIST DETAIL PANEL -->
     <div class="panel" id="panel-playlist">
-      <div class="playlist-detail-header">
-        <div class="sort-label" id="playlist-detail-name"></div>
-        <div class="playlist-detail-count" id="playlist-detail-count"></div>
-        <button class="pl-col-btn" id="col-picker-btn" onclick="toggleColPicker()">⊞ columnas</button>
+      <div class="playlist-detail-header" style="flex-wrap:wrap;row-gap:0">
+        <div style="flex:1 0 100%;display:flex;align-items:baseline;gap:12px">
+          <div class="sort-label" id="playlist-detail-name"></div>
+          <div class="playlist-detail-count" id="playlist-detail-count"></div>
+          <button class="pl-col-btn" id="col-picker-btn" onclick="toggleColPicker()">⊞ columnas</button>
+        </div>
+        <div id="playlist-detail-vibe"></div>
       </div>
       <div id="col-picker" style="display:none"></div>
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
@@ -756,6 +780,27 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- OVERLAP ANALYSIS MODAL -->
+<div id="overlap-modal" class="dialog-overlay">
+  <div class="dialog-box" style="width:600px;max-width:92vw;max-height:86vh;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+      <div class="sort-label">ANÁLISIS DE OVERLAPS</div>
+      <button style="margin-left:auto;font-size:20px;line-height:1;color:#444;background:transparent;border:none;cursor:pointer;padding:0 4px" onclick="closeOverlapModal()">×</button>
+    </div>
+    <div style="font-size:11px;color:#6A6858;flex-shrink:0">Detecta qué playlists comparten vibe y podrían recibir las mismas pistas.</div>
+    <div class="overlap-chat" id="overlap-chat"></div>
+    <div id="overlap-questions-bar" style="display:none;flex-direction:column;gap:4px;flex-shrink:0"></div>
+    <div id="overlap-input-row" style="display:none;gap:8px;flex-shrink:0">
+      <textarea class="overlap-input" id="overlap-input" rows="2" placeholder="Responde o escribe tu pregunta..."></textarea>
+      <button class="pl-inline-save" id="overlap-send-btn" onclick="sendOverlapMessage()">Enviar</button>
+    </div>
+    <div id="overlap-status" style="font-size:11px;color:#6A6858;min-height:16px;flex-shrink:0"></div>
+  </div>
+</div>
+
+<div id="export-overlay"></div>
+<div id="export-bar-wrap"><div id="export-bar"></div></div>
 
 <script>
 // ---------------------------------------------------------------
@@ -1050,6 +1095,8 @@ function renderTopbar() {
 // RENDER: SIDEBAR
 // ---------------------------------------------------------------
 let _sidebarFilledDots = new Set();
+let _playlistsSearch   = '';
+let _playlistsSortAlpha = true;
 
 function renderSidebar() {
   const active = state.playlists.filter(p => !p.hidden);
@@ -1111,13 +1158,20 @@ function selectTrackById(id) {
 // RENDER: UNIFIED PLAYLISTS PANEL
 // ---------------------------------------------------------------
 function renderPlaylistsPanel() {
-  const active = state.playlists.filter(p => !p.hidden);
+  const q      = _playlistsSearch.toLowerCase();
+  const active = state.playlists.filter(p => !p.hidden && (!q || playlistDisplayName(p.name).toLowerCase().includes(q)));
   const hidden = state.playlists.filter(p => p.hidden);
 
-  const activeHtml = active.length
-    ? active.map(p => {
+  let displayActive = [...active];
+  if (_playlistsSortAlpha) {
+    displayActive.sort((a, b) => playlistDisplayName(a.name).localeCompare(playlistDisplayName(b.name)));
+  }
+
+  const activeHtml = displayActive.length
+    ? displayActive.map(p => {
         const masterIdx = state.playlists.indexOf(p);
         const hasVibe   = p.vibe && p.vibe.trim();
+        const allActive = state.playlists.filter(x => !x.hidden);
         const isFirst   = masterIdx === 0 || state.playlists.slice(0, masterIdx).every(q => q.hidden);
         const isLast    = masterIdx === state.playlists.length - 1 || state.playlists.slice(masterIdx + 1).every(q => q.hidden);
         return '<div class="pl-mgmt-row" id="plrow-' + masterIdx + '">'
@@ -1135,7 +1189,7 @@ function renderPlaylistsPanel() {
           + '</div>'
           + '</div>';
       }).join('')
-    : '<div class="manage-empty">Sin playlists activas.</div>';
+    : '<div class="manage-empty">' + (q ? 'Sin resultados.' : 'Sin playlists activas.') + '</div>';
 
   const hiddenHtml = hidden.length
     ? hidden.map(p => {
@@ -1154,8 +1208,13 @@ function renderPlaylistsPanel() {
 
   document.getElementById('playlists-active-section').innerHTML =
     '<div class="pl-mgmt-section">'
-    + '<div class="pl-mgmt-header" style="display:flex;align-items:center">PLAYLISTS ACTIVAS <span style="color:#3A3830;margin-left:4px">· ' + active.length + '</span>'
-    + '<button class="pl-action" style="margin-left:auto" onclick="showCreateForm()">+ Nueva</button></div>'
+    + '<div class="pl-mgmt-header" style="display:flex;align-items:center;gap:4px">PLAYLISTS ACTIVAS <span style="color:#3A3830;margin-left:4px">· ' + state.playlists.filter(p=>!p.hidden).length + '</span>'
+    + '<button class="pl-action" style="margin-left:auto" onclick="_playlistsSortAlpha=!_playlistsSortAlpha;renderPlaylistsPanel()" title="Orden">' + (_playlistsSortAlpha ? 'A–Z' : 'Mi orden') + '</button>'
+    + '<button class="pl-action" onclick="openOverlapModal()">Overlaps</button>'
+    + '<button class="pl-action" onclick="showCreateForm()">+ Nueva</button></div>'
+    + '<div style="padding:6px 14px 2px;border-bottom:1px solid #0E0E0A">'
+    + '<input class="track-search" id="playlists-search" style="border-bottom:none;font-size:11px;width:100%;box-sizing:border-box" placeholder="Buscar playlist..." value="' + esc(_playlistsSearch) + '" oninput="_playlistsSearch=this.value;renderPlaylistsPanel()">'
+    + '</div>'
     + '<div id="create-form-slot"></div>'
     + activeHtml + '</div>';
 
@@ -1417,6 +1476,29 @@ function renderSessionPanel() {
 
 async function exportXML() {
   const resultEl = document.getElementById('export-result');
+
+  // Mostrar barra de carga
+  const overlay = document.getElementById('export-overlay');
+  const bar     = document.getElementById('export-bar');
+  overlay.classList.remove('fading');
+  overlay.classList.add('visible');
+  bar.classList.remove('done', 'running');
+  void bar.offsetWidth; // reflow para reiniciar transición
+  bar.classList.add('running');
+
+  function _hideExportBar() {
+    bar.classList.remove('running');
+    bar.classList.add('done');
+    setTimeout(() => {
+      overlay.classList.add('fading');
+      overlay.addEventListener('transitionend', () => {
+        overlay.classList.remove('visible', 'fading');
+        bar.classList.remove('done');
+        bar.style.width = '';
+      }, { once: true });
+    }, 160);
+  }
+
   try {
     // Abrir el file picker PRIMERO, antes de cualquier await de red,
     // para que siga dentro del contexto del gesto del usuario (click).
@@ -1428,6 +1510,7 @@ async function exportXML() {
           types: [{ description: 'XML', accept: {'application/xml': ['.xml']} }],
         });
       } catch (err) {
+        _hideExportBar();
         if (err.name === 'AbortError') return; // usuario canceló
         throw err;
       }
@@ -1458,8 +1541,10 @@ async function exportXML() {
     resultEl.innerHTML =
       'Exportado <span>' + count + ' pista' + (count !== 1 ? 's' : '') + '</span> → <span>' + esc(savedName) + '</span>';
     showToast('Exportado: ' + savedName);
+    _hideExportBar();
   } catch(e) {
     resultEl.innerHTML = '<span style="color:#FF3D1A">' + esc(e.message) + '</span>';
+    _hideExportBar();
   }
 }
 
@@ -1665,6 +1750,7 @@ async function placeTrack(idx, playlist) {
         artist:         state.selected.artist,
         bpm:            state.selected.bpm,
         key:            state.selected.key,
+        location:       state.selected.location || '',
         source_playlist: state.selectedFrom || null,
       })
     });
@@ -2068,6 +2154,9 @@ async function openPlaylist(name) {
   state.selected = null;
   document.getElementById('playlist-detail-name').textContent = playlistDisplayName(name);
   document.getElementById('playlist-detail-count').textContent = '';
+  const _plVibe = state.playlists.find(p => p.name === name);
+  const _vibeEl = document.getElementById('playlist-detail-vibe');
+  if (_vibeEl) _vibeEl.textContent = (_plVibe && _plVibe.vibe) ? _plVibe.vibe : '';
   document.getElementById('playlist-detail-tracks').innerHTML =
     '<div class="matching-state">Cargando...</div>';
   document.getElementById('playlist-col-header').innerHTML = '';
@@ -2387,6 +2476,7 @@ async function placeFromDialog(idx, playlist) {
         artist:          state.selected.artist,
         bpm:             state.selected.bpm,
         key:             state.selected.key,
+        location:        state.selected.location || '',
         source_playlist: state.selectedFrom || null,
       })
     });
@@ -2401,6 +2491,7 @@ async function placeFromDialog(idx, playlist) {
     renderSessionPanel();
     showToast('→ ' + playlistDisplayName(playlist));
     document.getElementById('dialog-textarea').value = '';
+    document.getElementById('sort-textarea').value = '';
     closeActionDialog();
     pulsePlaylistTitle(playlist);
 
@@ -2455,6 +2546,7 @@ async function createAndPlaceTrack(name, vibe, ctx) {
         artist:          state.selected.artist,
         bpm:             state.selected.bpm,
         key:             state.selected.key,
+        location:        state.selected.location || '',
         source_playlist: state.selectedFrom || null,
       })
     });
@@ -2899,6 +2991,7 @@ async function rejectInboxTrack(id) {
       artist:          t.artist,
       bpm:             t.bpm,
       key:             t.key,
+      location:        t.location || '',
       source_playlist: state.inbox || null,
     })
   });
@@ -3113,6 +3206,137 @@ async function checkAudioServer() {
     if (el) el.textContent = 'Servidor de audio no detectado — corre krate_audio.py para reproducir música';
   }
 }
+
+// ---------------------------------------------------------------
+// OVERLAP ANALYSIS MODAL
+// ---------------------------------------------------------------
+let _overlapConversation = [];
+
+function openOverlapModal() {
+  _overlapConversation = [];
+  document.getElementById('overlap-chat').innerHTML = '';
+  document.getElementById('overlap-questions-bar').style.display = 'none';
+  document.getElementById('overlap-input-row').style.display = 'none';
+  document.getElementById('overlap-status').textContent = '';
+  document.getElementById('overlap-modal').classList.add('open');
+  runOverlapAnalysis();
+}
+
+function closeOverlapModal() {
+  document.getElementById('overlap-modal').classList.remove('open');
+}
+
+document.getElementById('overlap-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeOverlapModal();
+});
+
+function _appendOverlapMsg(role, html) {
+  const chat = document.getElementById('overlap-chat');
+  const div  = document.createElement('div');
+  div.className = 'overlap-msg ' + role;
+  div.innerHTML = html;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function _renderOverlapAiResponse(data) {
+  let html = '';
+
+  if (data.follow_up) {
+    html += '<div style="margin-bottom:8px">' + esc(data.follow_up) + '</div>';
+  }
+
+  if (data.overlaps && data.overlaps.length) {
+    data.overlaps.forEach(function(o) {
+      const names = (o.playlists || []).map(function(n) { return esc(n); }).join(' ↔ ');
+      html += '<div class="overlap-pair">'
+        + '<div class="overlap-pair-names">' + names + '</div>'
+        + '<div class="overlap-pair-reason">' + esc(o.reason) + '</div>'
+        + '</div>';
+    });
+  } else if (!data.follow_up) {
+    html += '<div style="color:#6A6858;font-style:italic">No se detectaron overlaps significativos.</div>';
+  }
+
+  _appendOverlapMsg('ai', html);
+
+  const qBar = document.getElementById('overlap-questions-bar');
+  if (data.questions && data.questions.length) {
+    qBar.style.display = 'flex';
+    qBar.innerHTML = '<div style="font-size:9px;color:#3A3830;letter-spacing:2px;margin-bottom:4px">PREGUNTAS SUGERIDAS</div>'
+      + '<div class="overlap-questions">'
+      + data.questions.map(function(q) {
+          return '<div class="overlap-q" onclick="clickOverlapQuestion(' + JSON.stringify(q) + ')">' + esc(q) + '</div>';
+        }).join('')
+      + '</div>';
+  } else {
+    qBar.style.display = 'none';
+    qBar.innerHTML = '';
+  }
+
+  const inputRow = document.getElementById('overlap-input-row');
+  inputRow.style.display = 'flex';
+  document.getElementById('overlap-status').textContent = '';
+}
+
+function clickOverlapQuestion(q) {
+  document.getElementById('overlap-input').value = q;
+  sendOverlapMessage();
+}
+
+async function runOverlapAnalysis(userMessage) {
+  const statusEl = document.getElementById('overlap-status');
+  const sendBtn  = document.getElementById('overlap-send-btn');
+  statusEl.textContent = 'Analizando…';
+  if (sendBtn) sendBtn.disabled = true;
+
+  const playlists = state.playlists
+    .filter(function(p) { return !p.hidden && p.vibe && p.vibe.trim(); })
+    .map(function(p) { return { name: playlistDisplayName(p.name), vibe: p.vibe }; });
+
+  if (!playlists.length) {
+    statusEl.textContent = 'No hay playlists con descripción de vibe.';
+    if (sendBtn) sendBtn.disabled = false;
+    return;
+  }
+
+  if (userMessage) {
+    _overlapConversation.push({ role: 'user', content: userMessage });
+    _appendOverlapMsg('user', esc(userMessage));
+  }
+
+  try {
+    const res  = await fetch('/api/analyze-overlap', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ playlists: playlists, conversation: _overlapConversation })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.message || data.error);
+
+    _overlapConversation.push({ role: 'assistant', content: JSON.stringify(data) });
+    _renderOverlapAiResponse(data);
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    document.getElementById('overlap-input-row').style.display = 'flex';
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+async function sendOverlapMessage() {
+  const input = document.getElementById('overlap-input');
+  const msg   = (input.value || '').trim();
+  if (!msg) return;
+  input.value = '';
+  document.getElementById('overlap-questions-bar').style.display = 'none';
+  document.getElementById('overlap-input-row').style.display = 'none';
+  await runOverlapAnalysis(msg);
+}
+
+document.getElementById('overlap-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendOverlapMessage(); }
+});
 
 // ---------------------------------------------------------------
 // INIT
