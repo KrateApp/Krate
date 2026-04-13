@@ -810,17 +810,18 @@ def get_vibes():
     return jsonify(load_vibes())
 
 
-@app.route("/api/vibes/generate", methods=["POST"])
-def generate_vibe_route():
-    from krate import generate_vibe
+@app.route("/api/vibes/chat", methods=["POST"])
+def vibe_chat_route():
+    from krate import chat_vibe
     data         = request.get_json()
+    mode         = data.get("mode", "create")
     name         = (data.get("name") or "").strip()
-    answers      = data.get("answers") or {}
     current_vibe = (data.get("current_vibe") or "").strip() or None
-    if not answers.get("moment") and not answers.get("energy"):
-        return jsonify({"error": "Se requieren al menos momento y energía"}), 400
+    history      = data.get("history") or []
+    if not history:
+        return jsonify({"error": "Se requiere historial de conversación"}), 400
     try:
-        result = generate_vibe(name, answers, current_vibe=current_vibe)
+        result = chat_vibe(mode, name, history, current_vibe=current_vibe)
         return jsonify(result)
     except Exception as e:
         import anthropic

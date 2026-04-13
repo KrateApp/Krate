@@ -171,40 +171,43 @@ Respond with JSON only — no markdown, no explanation:
 
 
 
-def generate_vibe(playlist_name: str, answers: dict, current_vibe: str = None) -> dict:
+def chat_vibe(mode: str, playlist_name: str, history: list, current_vibe: str = None) -> dict:
     """
-    Genera o refina una descripción de vibe para una playlist basándose en
-    respuestas guiadas del usuario.
-    answers: {moment: str, energy: str, keyword: str}
-    Returns: {"name": str, "vibe": str}
+    Flujo conversacional para crear o refinar el vibe de una playlist.
+    mode: 'create' | 'refine'
+    history: lista de {role: 'user'|'assistant', content: str}
+    Devuelve:
+      {"type": "question", "message": "..."}        — IA necesita más info
+      {"type": "suggestion", "name": "...", "vibe": "..."}  — IA tiene sugerencia
     """
-    moment  = answers.get('moment', '')
-    energy  = answers.get('energy', '')
-    keyword = answers.get('keyword', '').strip()
+    current_block = f'\nVibe actual de la playlist: "{current_vibe}"' if current_vibe else ""
+    mode_context = (
+        "El DJ quiere CREAR una nueva playlist y necesita nombre y descripción de vibe."
+        if mode == "create"
+        else f"El DJ quiere REFINAR la descripción de vibe de su playlist existente \"{playlist_name}\".{current_block}"
+    )
 
-    refine_block = ""
-    if current_vibe:
-        refine_block = f"\nDESCRIPCIÓN ACTUAL (mejorar o redefinir según las respuestas):\n{current_vibe}\n"
+    system = f"""Eres Krate, un asistente para DJs que ayuda a definir el vibe de playlists.
+{mode_context}
 
-    keyword_block = f"\nPalabra clave del usuario: {keyword}" if keyword else ""
+Tu trabajo es hacer preguntas conversacionales para entender qué siente el DJ sobre esta playlist — su energía, mood, momento en el set, contexto.
+Habla en el mismo idioma que use el DJ (español o inglés).
+Sé conciso y directo. Máximo 2 preguntas por turno.
 
-    prompt = f"""Eres Krate, un asistente para DJs que ayuda a definir el vibe de sus playlists.
-El DJ respondió estas preguntas sobre su playlist "{playlist_name}":{refine_block}
+Cuando tengas suficiente información (generalmente después de 1-3 intercambios), proporciona una sugerencia.
 
-- Momento del set: {moment}
-- Energía / atmósfera: {energy}{keyword_block}
+IMPORTANTE — responde siempre con JSON:
+- Si necesitas más información: {{"type": "question", "message": "tu pregunta aquí"}}
+- Si tienes suficiente información: {{"type": "suggestion", "name": "Nombre Corto", "vibe": "Una oración que describa el vibe para un DJ"}}
 
-Con esa información, escribe un nombre corto y una descripción de vibe de una oración.
-El vibe debe describir la energía, el mood y el contexto para el que un DJ usaría esta playlist.
-Escribe el vibe en español, a menos que la palabra clave esté en inglés — en ese caso usa inglés.
-
-Responde solo con JSON, sin markdown ni explicaciones:
-{{"name": "Nombre corto", "vibe": "Una oración que describa el vibe"}}"""
+Para mode=refine, el "name" debe ser el mismo que la playlist actual (no lo cambies a menos que el DJ pida cambiarlo).
+Responde SOLO con JSON, sin texto adicional."""
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}]
+        max_tokens=400,
+        system=system,
+        messages=history
     )
     raw = _strip_json_fences(message.content[0].text)
     return json.loads(raw)

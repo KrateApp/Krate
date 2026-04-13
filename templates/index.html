@@ -168,16 +168,26 @@ body{font-family:var(--font-sans,system-ui);margin:0}
 .pl-inline-input{flex:1;background:#0A0908;border:1px solid #333;border-radius:3px;padding:5px 8px;color:#C8C4B8;font-size:12px;outline:none;font-family:inherit}
 .pl-inline-save{font-size:10px;padding:5px 10px;background:#FF3D1A;color:#fff;border:none;border-radius:3px;cursor:pointer;letter-spacing:0.5px}
 /* vibe IA modal */
-.vibe-modal-box{background:#080807;border:1px solid #1A1914;border-radius:4px;width:400px;max-width:92vw;padding:20px;display:flex;flex-direction:column;gap:14px}
-.vibe-modal-title{font-size:9px;color:#6A6858;letter-spacing:3px}
-.vibe-modal-question{font-size:11px;color:#9A9880;margin-bottom:6px}
-.vibe-modal-options{display:flex;flex-wrap:wrap;gap:6px}
-.vibe-modal-chip{font-size:10px;padding:5px 10px;border-radius:20px;border:1px solid #1A1914;color:#6A6858;background:transparent;cursor:pointer;transition:all .1s;letter-spacing:0.5px}
-.vibe-modal-chip:hover{border-color:#333;color:#888}
-.vibe-modal-chip.selected{background:#FF3D1A;color:#fff;border-color:#FF3D1A}
-.vibe-modal-keyword{width:100%;background:#0A0908;border:1px solid #1A1914;border-radius:3px;padding:6px 10px;color:#C8C4B8;font-size:12px;outline:none;font-family:inherit}
-.vibe-modal-keyword:focus{border-color:#333}
-.vibe-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.vibe-modal-box{background:#080807;border:1px solid #1A1914;border-radius:4px;width:420px;max-width:92vw;padding:0;display:flex;flex-direction:column;overflow:hidden;max-height:80vh}
+.vibe-modal-header{padding:14px 16px;border-bottom:1px solid #1A1914;font-size:9px;color:#6A6858;letter-spacing:3px;flex-shrink:0;display:flex;align-items:center;gap:8px}
+.vibe-modal-header span{color:#2A4A6A;font-size:8px;letter-spacing:2px}
+.vibe-modal-chat{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:120px}
+.vibe-msg-ai{background:#0D1929;border:1px solid #1A2A3A;border-radius:3px 10px 10px 10px;padding:10px 12px;font-size:12px;color:#9AB8D4;line-height:1.5;align-self:flex-start;max-width:90%}
+.vibe-msg-user{background:#0E0D0B;border:1px solid #2A2920;border-radius:10px 3px 10px 10px;padding:8px 12px;font-size:12px;color:#9A9880;line-height:1.5;align-self:flex-end;max-width:90%}
+.vibe-msg-suggestion{background:#0A1A0A;border:1px solid #1A3A1A;border-radius:3px 10px 10px 10px;padding:12px 14px;font-size:12px;color:#7ABD7A;line-height:1.5;align-self:flex-start;max-width:90%}
+.vibe-msg-suggestion .vibe-suggest-name{font-size:13px;color:#A8D8A8;font-weight:bold;margin-bottom:4px}
+.vibe-msg-suggestion .vibe-suggest-desc{color:#7ABD7A}
+.vibe-modal-input-row{padding:10px 14px;border-top:1px solid #1A1914;display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
+.vibe-modal-input{flex:1;background:#0A0908;border:1px solid #1A1914;border-radius:3px;padding:8px 10px;color:#C8C4B8;font-size:12px;outline:none;font-family:inherit;resize:none;line-height:1.5;max-height:80px}
+.vibe-modal-input:focus{border-color:#2A2920}
+.vibe-modal-send{background:#FF3D1A;color:#fff;border:none;border-radius:3px;padding:8px 14px;font-size:11px;cursor:pointer;flex-shrink:0;letter-spacing:0.5px;transition:opacity .1s}
+.vibe-modal-send:disabled{opacity:0.4;cursor:not-allowed}
+.vibe-modal-footer{padding:10px 14px;border-top:1px solid #1A1914;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.vibe-typing{display:flex;gap:4px;align-items:center;padding:6px 0}
+.vibe-typing span{width:5px;height:5px;border-radius:50%;background:#2A4A6A;animation:vibe-bounce .8s infinite}
+.vibe-typing span:nth-child(2){animation-delay:.15s}
+.vibe-typing span:nth-child(3){animation-delay:.3s}
+@keyframes vibe-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 .btn-ai{font-size:10px;padding:5px 10px;border-radius:3px;cursor:pointer;letter-spacing:0.5px;border:1px solid #1A1914;color:#9A9880;background:transparent;transition:all .1s}
 .btn-ai:hover{border-color:#FF3D1A;color:#FF3D1A}
 
@@ -1238,20 +1248,17 @@ function renderPlaylistsPanel() {
         const isFirst   = masterIdx === 0 || state.playlists.slice(0, masterIdx).every(q => q.hidden);
         const isLast    = masterIdx === state.playlists.length - 1 || state.playlists.slice(masterIdx + 1).every(q => q.hidden);
         const safeName = p.name.replace(/'/g,"\'");
-        return '<div class="pl-mgmt-row" id="plrow-' + masterIdx + '" draggable="true"'
-          + ' ondragstart="_plPanelDragStart(event,\'' + safeName + '\')"'
-          + ' ondragover="_plPanelDragOver(event)"'
-          + ' ondrop="_plPanelDrop(event,\'' + safeName + '\')"'
-          + ' ondragleave="_plPanelDragLeave(event)">'
-          + '<div class="pl-mgmt-drag" title="Arrastrar">⠿</div>'
+        return '<div class="pl-mgmt-row" id="plrow-' + masterIdx + '">'
           + '<div class="dot ' + (hasVibe ? 'filled' : 'empty') + '" style="margin-top:3px;flex-shrink:0"></div>'
-          + '<div class="pl-mgmt-body" onclick="if(!_plPanelDragName)openPlaylist(\'' + safeName + '\')" style="cursor:pointer;flex:1">'
+          + '<div class="pl-mgmt-body" onclick="openPlaylist(\'' + safeName + '\')" style="cursor:pointer;flex:1">'
           + '<div class="pl-mgmt-name">' + esc(playlistDisplayName(p.name)) + (p.virtual ? '<span style="font-size:9px;color:#2A2A22;margin-left:8px;letter-spacing:1px">VIRTUAL</span>' : '') + '</div>'
           + '<div class="pl-mgmt-desc' + (hasVibe ? '' : ' empty') + '">'
           + (hasVibe ? esc(p.vibe) : 'sin descripción') + '</div>'
           + '</div>'
           + '<div class="pl-mgmt-actions">'
           + '<button class="pl-action" onclick="editVibeInline(' + masterIdx + ')">Editar</button>'
+          + '<button class="pl-move-btn" onclick="event.stopPropagation();movePlaylist(' + masterIdx + ',-1)"' + (isFirst ? ' disabled style="opacity:0.2"' : '') + '>↑</button>'
+          + '<button class="pl-move-btn" onclick="event.stopPropagation();movePlaylist(' + masterIdx + ',1)"' + (isLast ? ' disabled style="opacity:0.2"' : '') + '>↓</button>'
           + '<button class="pl-action" id="del-btn-' + masterIdx + '" onclick="deletePlaylistConfirm(' + masterIdx + ',this)">Borrar</button>'
           + '</div>'
           + '</div>';
@@ -1396,32 +1403,27 @@ function _plPanelDragStart(e, name) {
   _plPanelDragName = name;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', name);
-  e.stopPropagation();
 }
 function _plPanelDragOver(e) {
   e.preventDefault();
-  e.stopPropagation();
-  e.dataTransfer.dropEffect = 'move';
-  // find the closest pl-mgmt-row
-  const row = e.target.closest('.pl-mgmt-row');
-  if (row) row.classList.add('drag-over');
+  e.currentTarget.classList.add('drag-over');
 }
 function _plPanelDragLeave(e) {
-  const row = e.target.closest('.pl-mgmt-row');
-  if (row && !row.contains(e.relatedTarget)) row.classList.remove('drag-over');
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
 }
 function _plPanelDrop(e, targetName) {
   e.preventDefault();
-  e.stopPropagation();
-  const row = e.target.closest('.pl-mgmt-row');
-  if (row) row.classList.remove('drag-over');
-  if (!_plPanelDragName || _plPanelDragName === targetName) { _plPanelDragName = null; return; }
-  const fi = state.playlists.findIndex(p => p.name === _plPanelDragName);
+  e.currentTarget.classList.remove('drag-over');
+  const srcName = _plPanelDragName;
+  _plPanelDragName = null;
+  if (!srcName || srcName === targetName) return;
+  const fi = state.playlists.findIndex(p => p.name === srcName);
   const ti = state.playlists.findIndex(p => p.name === targetName);
-  if (fi < 0 || ti < 0) { _plPanelDragName = null; return; }
+  if (fi < 0 || ti < 0) return;
   const [moved] = state.playlists.splice(fi, 1);
   state.playlists.splice(ti, 0, moved);
-  _plPanelDragName = null;
   renderPlaylistsPanel();
   renderSidebar();
   saveOrder();
@@ -3345,95 +3347,157 @@ async function checkAudioServer() {
 
 
 // ---------------------------------------------------------------
-// VIBE IA MODAL
+// VIBE IA MODAL — flujo conversacional
 // ---------------------------------------------------------------
-let _vibeIA = { mode: null, masterIdx: null, answers: { moment: '', energy: '' } };
+let _vibeIA = { mode: null, masterIdx: null, history: [], lastSuggestion: null };
 
 function openVibeIAModal(mode, masterIdx) {
-  // mode: 'create' | 'refine'
-  _vibeIA = { mode, masterIdx, answers: { moment: '', energy: '' } };
-  // reset chips
-  document.querySelectorAll('.vibe-modal-chip').forEach(c => c.classList.remove('selected'));
-  document.getElementById('vibe-ia-keyword').value = '';
-  document.getElementById('vibe-ia-btn-gen').textContent = 'Generar →';
-  document.getElementById('vibe-ia-btn-gen').disabled = false;
+  _vibeIA = { mode, masterIdx, history: [], lastSuggestion: null };
+  document.getElementById('vibe-ia-mode-label').textContent = mode === 'create' ? 'CREAR' : 'EDITAR';
+  document.getElementById('vibe-ia-chat').innerHTML = '';
+  document.getElementById('vibe-ia-input').value = '';
+  document.getElementById('vibe-ia-input-row').style.display = 'flex';
+  document.getElementById('vibe-ia-footer').style.display = 'none';
+  document.getElementById('vibe-ia-send').disabled = false;
 
-  // show current vibe if refining
-  const currentDiv = document.getElementById('vibe-ia-current');
-  if (mode === 'refine' && masterIdx !== null) {
-    const pl = state.playlists[masterIdx];
-    if (pl && pl.vibe) {
-      currentDiv.textContent = 'Vibe actual: ' + pl.vibe;
-      currentDiv.style.display = 'block';
-    } else {
-      currentDiv.style.display = 'none';
-    }
-  } else {
-    currentDiv.style.display = 'none';
-  }
+  const firstMsg = mode === 'create'
+    ? '¿Qué tenías en mente? Dime en qué estás pensando para esta playlist.'
+    : (() => {
+        const pl = state.playlists[masterIdx];
+        const currentVibe = pl && pl.vibe ? pl.vibe : null;
+        return currentVibe
+          ? '¿Qué quieres cambiar? ¿Qué te está molestando o dónde falta claridad?\n\nVibe actual: "' + currentVibe + '"'
+          : '¿Qué quieres cambiar o cómo quieres redefinir esta playlist?';
+      })();
+
+  _vibeIAAddMsg('ai', firstMsg);
+  _vibeIA.history.push({ role: 'assistant', content: firstMsg });
 
   document.getElementById('vibe-ia-modal').classList.add('open');
+  setTimeout(() => document.getElementById('vibe-ia-input').focus(), 100);
 }
 
 function closeVibeIAModal() {
   document.getElementById('vibe-ia-modal').classList.remove('open');
 }
 
-function _vibeSelectChip(el, group, value) {
-  document.querySelectorAll('#vibe-chips-' + group + ' .vibe-modal-chip').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  _vibeIA.answers[group] = value;
+function _vibeIAAddMsg(type, text) {
+  const chat = document.getElementById('vibe-ia-chat');
+  const div = document.createElement('div');
+  if (type === 'ai')         div.className = 'vibe-msg-ai';
+  else if (type === 'user')  div.className = 'vibe-msg-user';
+  else                       div.className = 'vibe-msg-suggestion';
+
+  if (type === 'suggestion' && typeof text === 'object') {
+    div.innerHTML = '<div class="vibe-suggest-name">' + esc(text.name || '') + '</div>'
+      + '<div class="vibe-suggest-desc">' + esc(text.vibe || '') + '</div>';
+  } else {
+    div.textContent = text;
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
 }
 
-async function runVibeIA() {
-  if (!_vibeIA.answers.moment || !_vibeIA.answers.energy) {
-    showToast('Selecciona momento y energía');
-    return;
-  }
-  const btn = document.getElementById('vibe-ia-btn-gen');
-  btn.textContent = 'Generando...';
-  btn.disabled = true;
+function _vibeIAShowTyping() {
+  const chat = document.getElementById('vibe-ia-chat');
+  const div = document.createElement('div');
+  div.className = 'vibe-msg-ai vibe-typing';
+  div.id = 'vibe-ia-typing';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
 
-  const keyword = document.getElementById('vibe-ia-keyword').value.trim();
-  _vibeIA.answers.keyword = keyword;
+function _vibeIAHideTyping() {
+  const t = document.getElementById('vibe-ia-typing');
+  if (t) t.remove();
+}
+
+async function _vibeIASend() {
+  const input = document.getElementById('vibe-ia-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  _vibeIAAddMsg('user', text);
+  _vibeIA.history.push({ role: 'user', content: text });
+
+  document.getElementById('vibe-ia-send').disabled = true;
+  _vibeIAShowTyping();
 
   let name = '';
   let current_vibe = null;
   if (_vibeIA.mode === 'create') {
     name = (document.getElementById('new-pl-name')?.value || '').trim();
-  } else if (_vibeIA.mode === 'refine' && _vibeIA.masterIdx !== null) {
+  } else if (_vibeIA.masterIdx !== null) {
     const pl = state.playlists[_vibeIA.masterIdx];
     name = playlistDisplayName(pl.name);
     current_vibe = pl.vibe || null;
   }
 
   try {
-    const r = await fetch('/api/vibes/generate', {
+    const r = await fetch('/api/vibes/chat', {
       method:  'POST',
       headers: {'Content-Type': 'application/json'},
-      body:    JSON.stringify({ name, answers: _vibeIA.answers, current_vibe })
+      body:    JSON.stringify({ mode: _vibeIA.mode, name, current_vibe, history: _vibeIA.history })
     });
     const data = await r.json();
-    if (data.error) { showToast('Error: ' + data.error); btn.textContent = 'Generar →'; btn.disabled = false; return; }
+    _vibeIAHideTyping();
 
-    closeVibeIAModal();
+    if (data.error) {
+      _vibeIAAddMsg('ai', 'Hubo un error: ' + data.error);
+      document.getElementById('vibe-ia-send').disabled = false;
+      return;
+    }
 
-    if (_vibeIA.mode === 'create') {
-      if (data.name && !document.getElementById('new-pl-name')?.value.trim()) {
-        const ni = document.getElementById('new-pl-name');
-        if (ni) ni.value = data.name;
-      }
-      const vi = document.getElementById('new-pl-vibe');
-      if (vi) { vi.value = data.vibe || ''; vi.focus(); }
-    } else if (_vibeIA.mode === 'refine' && _vibeIA.masterIdx !== null) {
-      const vi = document.getElementById('pl-vibe-input-' + _vibeIA.masterIdx);
-      if (vi) { vi.value = data.vibe || ''; vi.focus(); }
+    if (data.type === 'question') {
+      _vibeIAAddMsg('ai', data.message);
+      _vibeIA.history.push({ role: 'assistant', content: data.message });
+      document.getElementById('vibe-ia-send').disabled = false;
+      setTimeout(() => document.getElementById('vibe-ia-input').focus(), 50);
+    } else if (data.type === 'suggestion') {
+      _vibeIA.lastSuggestion = data;
+      const suggMsg = (data.name ? 'Nombre sugerido: ' + data.name + '\n' : '') + data.vibe;
+      _vibeIAAddMsg('suggestion', { name: data.name, vibe: data.vibe });
+      _vibeIA.history.push({ role: 'assistant', content: suggMsg });
+      document.getElementById('vibe-ia-input-row').style.display = 'none';
+      document.getElementById('vibe-ia-footer').style.display = 'flex';
     }
   } catch(e) {
-    showToast('Error al generar vibe');
-    btn.textContent = 'Generar →';
-    btn.disabled = false;
+    _vibeIAHideTyping();
+    _vibeIAAddMsg('ai', 'Error de conexión. Intenta de nuevo.');
+    document.getElementById('vibe-ia-send').disabled = false;
   }
+}
+
+function _vibeIAApply() {
+  const s = _vibeIA.lastSuggestion;
+  if (!s) return;
+  closeVibeIAModal();
+  if (_vibeIA.mode === 'create') {
+    if (s.name) {
+      const ni = document.getElementById('new-pl-name');
+      if (ni && !ni.value.trim()) ni.value = s.name;
+    }
+    const vi = document.getElementById('new-pl-vibe');
+    if (vi) { vi.value = s.vibe || ''; vi.focus(); }
+  } else if (_vibeIA.masterIdx !== null) {
+    const vi = document.getElementById('pl-vibe-input-' + _vibeIA.masterIdx);
+    if (vi) { vi.value = s.vibe || ''; vi.focus(); }
+  }
+}
+
+function _vibeIAReject() {
+  // vuelve a preguntas — la IA retoma con un follow-up
+  document.getElementById('vibe-ia-input-row').style.display = 'flex';
+  document.getElementById('vibe-ia-footer').style.display = 'none';
+  document.getElementById('vibe-ia-send').disabled = false;
+  const retryMsg = 'Entendido. ¿Qué no te convence o qué quieres ajustar?';
+  _vibeIAAddMsg('ai', retryMsg);
+  _vibeIA.history.push({ role: 'assistant', content: retryMsg });
+  setTimeout(() => document.getElementById('vibe-ia-input').focus(), 50);
 }
 
 // ---------------------------------------------------------------
@@ -3450,35 +3514,15 @@ localStorage.removeItem('krate_vibes_manual');
 <!-- Vibe IA modal -->
 <div id="vibe-ia-modal" class="dialog-overlay" onclick="if(event.target===this)closeVibeIAModal()">
   <div class="vibe-modal-box">
-    <div class="vibe-modal-title">✦ DEFINIR VIBE CON IA</div>
-    <div id="vibe-ia-current" style="display:none;font-size:11px;color:#6A6858;border-left:2px solid #2A2920;padding-left:8px;line-height:1.5"></div>
-    <div>
-      <div class="vibe-modal-question">¿Qué momento del set es esta playlist?</div>
-      <div class="vibe-modal-options" id="vibe-chips-moment">
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'moment','Apertura')">Apertura</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'moment','Mid set')">Mid</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'moment','Peak')">Peak</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'moment','Cierre')">Cierre</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'moment','Flexible')">Flexible</button>
-      </div>
+    <div class="vibe-modal-header">✦ ASISTENTE DE VIBE <span id="vibe-ia-mode-label">CREAR</span></div>
+    <div class="vibe-modal-chat" id="vibe-ia-chat"></div>
+    <div class="vibe-modal-input-row" id="vibe-ia-input-row">
+      <textarea class="vibe-modal-input" id="vibe-ia-input" rows="1" placeholder="Escribe aquí..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();_vibeIASend()}"></textarea>
+      <button class="vibe-modal-send" id="vibe-ia-send" onclick="_vibeIASend()">→</button>
     </div>
-    <div>
-      <div class="vibe-modal-question">¿Qué energía o atmósfera tiene?</div>
-      <div class="vibe-modal-options" id="vibe-chips-energy">
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'energy','Oscura')">Oscura</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'energy','Eufórica')">Eufórica</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'energy','Melancólica')">Melancólica</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'energy','Técnica')">Técnica</button>
-        <button class="vibe-modal-chip" onclick="_vibeSelectChip(this,'energy','Relajada')">Relajada</button>
-      </div>
-    </div>
-    <div>
-      <div class="vibe-modal-question">¿Una palabra que la defina? <span style="color:#3A3830">(opcional)</span></div>
-      <input class="vibe-modal-keyword" id="vibe-ia-keyword" placeholder="ej: groovy, minimal, raw, festivo..." maxlength="40"/>
-    </div>
-    <div class="vibe-modal-actions">
-      <button class="pl-action" onclick="closeVibeIAModal()">Cancelar</button>
-      <button class="pl-inline-save" id="vibe-ia-btn-gen" onclick="runVibeIA()">Generar →</button>
+    <div class="vibe-modal-footer" id="vibe-ia-footer" style="display:none">
+      <button class="pl-action" onclick="_vibeIAReject()">Intentar de nuevo</button>
+      <button class="pl-inline-save" onclick="_vibeIAApply()">Aplicar</button>
     </div>
   </div>
 </div>
