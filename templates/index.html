@@ -1245,7 +1245,7 @@ function renderPlaylistsPanel() {
           + ' ondragleave="_plPanelDragLeave(event)">'
           + '<div class="pl-mgmt-drag" title="Arrastrar">⠿</div>'
           + '<div class="dot ' + (hasVibe ? 'filled' : 'empty') + '" style="margin-top:3px;flex-shrink:0"></div>'
-          + '<div class="pl-mgmt-body" onclick="openPlaylist(\'' + safeName + '\')" style="cursor:pointer;flex:1">'
+          + '<div class="pl-mgmt-body" onclick="if(!_plPanelDragName)openPlaylist(\'' + safeName + '\')" style="cursor:pointer;flex:1">'
           + '<div class="pl-mgmt-name">' + esc(playlistDisplayName(p.name)) + (p.virtual ? '<span style="font-size:9px;color:#2A2A22;margin-left:8px;letter-spacing:1px">VIRTUAL</span>' : '') + '</div>'
           + '<div class="pl-mgmt-desc' + (hasVibe ? '' : ' empty') + '">'
           + (hasVibe ? esc(p.vibe) : 'sin descripción') + '</div>'
@@ -1395,24 +1395,30 @@ let _plPanelDragName = null;
 function _plPanelDragStart(e, name) {
   _plPanelDragName = name;
   e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', name);
+  e.stopPropagation();
 }
 function _plPanelDragOver(e) {
   e.preventDefault();
+  e.stopPropagation();
   e.dataTransfer.dropEffect = 'move';
-  const row = e.currentTarget;
-  row.classList.add('drag-over');
+  // find the closest pl-mgmt-row
+  const row = e.target.closest('.pl-mgmt-row');
+  if (row) row.classList.add('drag-over');
 }
 function _plPanelDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
+  const row = e.target.closest('.pl-mgmt-row');
+  if (row && !row.contains(e.relatedTarget)) row.classList.remove('drag-over');
 }
 function _plPanelDrop(e, targetName) {
   e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-  if (!_plPanelDragName || _plPanelDragName === targetName) return;
-  const allNames = state.playlists.map(p => p.name);
-  const fi = allNames.indexOf(_plPanelDragName);
-  const ti = allNames.indexOf(targetName);
-  if (fi < 0 || ti < 0) return;
+  e.stopPropagation();
+  const row = e.target.closest('.pl-mgmt-row');
+  if (row) row.classList.remove('drag-over');
+  if (!_plPanelDragName || _plPanelDragName === targetName) { _plPanelDragName = null; return; }
+  const fi = state.playlists.findIndex(p => p.name === _plPanelDragName);
+  const ti = state.playlists.findIndex(p => p.name === targetName);
+  if (fi < 0 || ti < 0) { _plPanelDragName = null; return; }
   const [moved] = state.playlists.splice(fi, 1);
   state.playlists.splice(ti, 0, moved);
   _plPanelDragName = null;
