@@ -241,22 +241,6 @@ def do_match():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/analyze-overlap", methods=["POST"])
-def analyze_overlap_route():
-    from krate import analyze_overlap
-    data         = request.get_json()
-    playlists    = data.get("playlists", [])
-    conversation = data.get("conversation", [])
-    if not playlists:
-        return jsonify({"error": "No playlists provided"}), 400
-    try:
-        return jsonify(analyze_overlap(playlists, conversation))
-    except Exception as e:
-        import anthropic as _anthropic
-        if isinstance(e, _anthropic.APIStatusError) and e.status_code == 529:
-            return jsonify({"error": "overloaded", "message": "La API está saturada. Intenta de nuevo."}), 529
-        return jsonify({"error": str(e)}), 500
-
 
 @app.route("/api/playlists/reorder", methods=["POST"])
 def reorder_playlists():
