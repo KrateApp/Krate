@@ -1257,8 +1257,8 @@ function renderPlaylistsPanel() {
           + '</div>'
           + '<div class="pl-mgmt-actions">'
           + '<button class="pl-action" onclick="editVibeInline(' + masterIdx + ')">Editar</button>'
-          + '<button class="pl-move-btn" onclick="event.stopPropagation();movePlaylist(' + masterIdx + ',-1)"' + (isFirst ? ' disabled style="opacity:0.2"' : '') + '>↑</button>'
-          + '<button class="pl-move-btn" onclick="event.stopPropagation();movePlaylist(' + masterIdx + ',1)"' + (isLast ? ' disabled style="opacity:0.2"' : '') + '>↓</button>'
+          + (!_playlistsSortAlpha ? '<button class="pl-move-btn" onclick="event.stopPropagation();movePlaylist(' + masterIdx + ',-1)"' + (isFirst ? ' disabled style="opacity:0.2"' : '') + '>↑</button>' : '')
+          + (!_playlistsSortAlpha ? '<button class="pl-move-btn" onclick="event.stopPropagation();movePlaylist(' + masterIdx + ',1)"' + (isLast ? ' disabled style="opacity:0.2"' : '') + '>↓</button>' : '')
           + '<button class="pl-action" id="del-btn-' + masterIdx + '" onclick="deletePlaylistConfirm(' + masterIdx + ',this)">Borrar</button>'
           + '</div>'
           + '</div>';
